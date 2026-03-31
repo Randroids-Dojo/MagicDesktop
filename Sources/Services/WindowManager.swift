@@ -6,7 +6,7 @@ enum WindowManager {
     // MARK: - Position & Capture
 
     static func positionWindow(for app: NSRunningApplication, frame: WindowFrame) {
-        guard let window = mainWindow(for: app.processIdentifier) else { return }
+        guard let window = targetWindow(for: app.processIdentifier) else { return }
 
         var position = CGPoint(x: frame.x, y: frame.y)
         var size = CGSize(width: frame.width, height: frame.height)
@@ -20,8 +20,19 @@ enum WindowManager {
         }
     }
 
+    static func raiseWindow(for app: NSRunningApplication) {
+        guard let window = targetWindow(for: app.processIdentifier) else { return }
+
+        _ = AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
+        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+    }
+
+    static func hasWindow(for app: NSRunningApplication) -> Bool {
+        targetWindow(for: app.processIdentifier) != nil
+    }
+
     static func captureCurrentFrame(for app: NSRunningApplication) -> WindowFrame? {
-        guard let window = mainWindow(for: app.processIdentifier) else { return nil }
+        guard let window = targetWindow(for: app.processIdentifier) else { return nil }
 
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
@@ -177,11 +188,56 @@ enum WindowManager {
 
     // MARK: - AX Window
 
-    private static func mainWindow(for pid: pid_t) -> AXUIElement? {
+    private static func targetWindow(for pid: pid_t) -> AXUIElement? {
         let appRef = AXUIElementCreateApplication(pid)
-        var windowRef: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXMainWindowAttribute as CFString, &windowRef)
-        guard result == .success else { return nil }
-        return (windowRef as! AXUIElement)
+
+        if let focusedWindow = window(for: appRef, attribute: kAXFocusedWindowAttribute as CFString) {
+            return focusedWindow
+        }
+
+        if let mainWindow = window(for: appRef, attribute: kAXMainWindowAttribute as CFString) {
+            return mainWindow
+        }
+
+        return firstStandardWindow(for: appRef)
+    }
+
+    private static func window(for appRef: AXUIElement, attribute: CFString) -> AXUIElement? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appRef, attribute, &value)
+        guard result == .success, let value, CFGetTypeID(value) == AXUIElementGetTypeID() else {
+            return nil
+        }
+        return unsafeBitCast(value, to: AXUIElement.self)
+    }
+
+    private static func firstStandardWindow(for appRef: AXUIElement) -> AXUIElement? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &value)
+        guard result == .success,
+              let value,
+              CFGetTypeID(value) == CFArrayGetTypeID() else {
+            return nil
+        }
+
+        let windows = axWindows(from: unsafeBitCast(value, to: CFArray.self))
+
+        return windows.first(where: isStandardWindow) ?? windows.first
+    }
+
+    private static func axWindows(from array: CFArray) -> [AXUIElement] {
+        (0..<CFArrayGetCount(array)).compactMap { index in
+            let value = CFArrayGetValueAtIndex(array, index)
+            let window = unsafeBitCast(value, to: CFTypeRef.self)
+            guard CFGetTypeID(window) == AXUIElementGetTypeID() else { return nil }
+            return unsafeBitCast(window, to: AXUIElement.self)
+        }
+    }
+
+    private static func isStandardWindow(_ window: AXUIElement) -> Bool {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &value)
+        guard result == .success, let subrole = value as? String else { return true }
+        return subrole == kAXStandardWindowSubrole as String
     }
 }
