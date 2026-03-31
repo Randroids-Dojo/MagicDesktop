@@ -1,0 +1,36 @@
+name: MagicDesktop
+options:
+  bundleIdPrefix: com.randy
+  deploymentTarget:
+    macOS: "14.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+
+packages:
+  KeyboardShortcuts:
+    url: https://github.com/sindresorhus/KeyboardShortcuts.git
+    from: "2.4.0"
+
+targets:
+  MagicDesktop:
+    type: application
+    platform: macOS
+    sources:
+      - Sources
+    settings:
+      base:
+        INFOPLIST_FILE: Sources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Sources/MagicDesktop.entitlements
+        PRODUCT_BUNDLE_IDENTIFIER: com.randy.MagicDesktop
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.10"
+        MACOSX_DEPLOYMENT_TARGET: "14.0"
+        GENERATE_INFOPLIST_FILE: false
+        CODE_SIGN_STYLE: Automatic
+    dependencies:
+      - package: KeyboardShortcuts
+    entitlements:
+      path: Sources/MagicDesktop.entitlements
+      properties:
+        com.apple.security.app-sandbox: false

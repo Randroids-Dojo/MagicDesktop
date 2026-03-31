@@ -1,0 +1,423 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		02294E744D562E193B1896B3 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB79DADF13DF881F30E9F9C8 /* MenuBarController.swift */; };
+		0887976CF17518F3C9AE4314 /* HotkeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA879BB080D78002EAC53D37 /* HotkeyService.swift */; };
+		0FEC228A84CBDF58DB112AFD /* SpaceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34739FEAB72B84CF548A11B /* SpaceConfiguration.swift */; };
+		2290690537BF666C9A0D9671 /* MagicDesktopApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558CE1F2A7C4608A61A3C5D9 /* MagicDesktopApp.swift */; };
+		430DE1AA799C331AF2F633A1 /* BuildInstallService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B58CE4F83B09EB897188074 /* BuildInstallService.swift */; };
+		4B82FDB915DB8603C4099AE6 /* ConfigurationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D731919C4EC03813AE5DC2E /* ConfigurationListView.swift */; };
+		4DD565861B75C24E09E9E339 /* ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA3B81170312482B1EA617E /* ConfigurationStore.swift */; };
+		4E05A98311CFB1341237ECC5 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 62B91CF7DC09092C84FB4404 /* KeyboardShortcuts */; };
+		63E3CF53F9C1ACA929192A67 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FD8857D7FF6E9DEF57A476 /* SettingsView.swift */; };
+		718B72EA5237D3408B7F66B7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21C3D1244DD029B27A5C155E /* AppDelegate.swift */; };
+		A276710645ADCA21C7FDD020 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9B62DB9180AB499DA8A88A /* WindowManager.swift */; };
+		BD6E7EBAD1778E4EBECDDB5D /* SpaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */; };
+		C55CC3137188FC0BD6C9D7C8 /* ConfigurationEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CFAB95567CC60E352011A098 /* ConfigurationEditorView.swift */; };
+		FDC0A5086A664EE5A672853B /* KeyboardShortcuts+Names.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD1287ECFE9DCB23811575C3 /* KeyboardShortcuts+Names.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0D731919C4EC03813AE5DC2E /* ConfigurationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationListView.swift; sourceTree = "<group>"; };
+		17FD8857D7FF6E9DEF57A476 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		21C3D1244DD029B27A5C155E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		3B58CE4F83B09EB897188074 /* BuildInstallService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInstallService.swift; sourceTree = "<group>"; };
+		417CC034461791A7B0B31204 /* MagicDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MagicDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		558CE1F2A7C4608A61A3C5D9 /* MagicDesktopApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MagicDesktopApp.swift; sourceTree = "<group>"; };
+		58E0C4CB2C6253208FAA4D33 /* MagicDesktop.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = MagicDesktop.entitlements; sourceTree = "<group>"; };
+		6BA3B81170312482B1EA617E /* ConfigurationStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationStore.swift; sourceTree = "<group>"; };
+		74CEA3D70CB5ECB9DBE38C6C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		A34739FEAB72B84CF548A11B /* SpaceConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceConfiguration.swift; sourceTree = "<group>"; };
+		BA879BB080D78002EAC53D37 /* HotkeyService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotkeyService.swift; sourceTree = "<group>"; };
+		CB79DADF13DF881F30E9F9C8 /* MenuBarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MenuBarController.swift; sourceTree = "<group>"; };
+		CD1287ECFE9DCB23811575C3 /* KeyboardShortcuts+Names.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "KeyboardShortcuts+Names.swift"; sourceTree = "<group>"; };
+		CFAB95567CC60E352011A098 /* ConfigurationEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationEditorView.swift; sourceTree = "<group>"; };
+		D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceManager.swift; sourceTree = "<group>"; };
+		DE9B62DB9180AB499DA8A88A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		B83C43C8A9F6B23C229C15E2 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4E05A98311CFB1341237ECC5 /* KeyboardShortcuts in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		037659FEC2FF57867EA32AA0 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				74CEA3D70CB5ECB9DBE38C6C /* Info.plist */,
+				58E0C4CB2C6253208FAA4D33 /* MagicDesktop.entitlements */,
+				C2372870D27ECB76009806C2 /* App */,
+				B03B8670D6B0CC7602EB8D07 /* Extensions */,
+				87FDE72C48F7A909642E8FCF /* Models */,
+				3BD20EB81612DC79287EBB56 /* Services */,
+				33C2D86FCC3427401CA6F0D8 /* UI */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		33C2D86FCC3427401CA6F0D8 /* UI */ = {
+			isa = PBXGroup;
+			children = (
+				CFAB95567CC60E352011A098 /* ConfigurationEditorView.swift */,
+				0D731919C4EC03813AE5DC2E /* ConfigurationListView.swift */,
+				17FD8857D7FF6E9DEF57A476 /* SettingsView.swift */,
+			);
+			path = UI;
+			sourceTree = "<group>";
+		};
+		3BD20EB81612DC79287EBB56 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				3B58CE4F83B09EB897188074 /* BuildInstallService.swift */,
+				6BA3B81170312482B1EA617E /* ConfigurationStore.swift */,
+				BA879BB080D78002EAC53D37 /* HotkeyService.swift */,
+				D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */,
+				DE9B62DB9180AB499DA8A88A /* WindowManager.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		87FDE72C48F7A909642E8FCF /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				A34739FEAB72B84CF548A11B /* SpaceConfiguration.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		8B369A2C7D5BD91C98AF4BF1 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				417CC034461791A7B0B31204 /* MagicDesktop.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		B03B8670D6B0CC7602EB8D07 /* Extensions */ = {
+			isa = PBXGroup;
+			children = (
+				CD1287ECFE9DCB23811575C3 /* KeyboardShortcuts+Names.swift */,
+			);
+			path = Extensions;
+			sourceTree = "<group>";
+		};
+		C2372870D27ECB76009806C2 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				21C3D1244DD029B27A5C155E /* AppDelegate.swift */,
+				558CE1F2A7C4608A61A3C5D9 /* MagicDesktopApp.swift */,
+				CB79DADF13DF881F30E9F9C8 /* MenuBarController.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		FBF7F2F6F7B9D41BC8CCAE77 = {
+			isa = PBXGroup;
+			children = (
+				037659FEC2FF57867EA32AA0 /* Sources */,
+				8B369A2C7D5BD91C98AF4BF1 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		5A5CCF7AFE6B638827772F6C /* MagicDesktop */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 685219C32D37F9D81CF08ED2 /* Build configuration list for PBXNativeTarget "MagicDesktop" */;
+			buildPhases = (
+				CDFB7CB2C141424E4F0377C3 /* Sources */,
+				B83C43C8A9F6B23C229C15E2 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = MagicDesktop;
+			packageProductDependencies = (
+				62B91CF7DC09092C84FB4404 /* KeyboardShortcuts */,
+			);
+			productName = MagicDesktop;
+			productReference = 417CC034461791A7B0B31204 /* MagicDesktop.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		45835D517F05BD2F62836A21 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					5A5CCF7AFE6B638827772F6C = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 1109BAEC82A95C098B88DFB8 /* Build configuration list for PBXProject "MagicDesktop" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = FBF7F2F6F7B9D41BC8CCAE77;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				AD46472C33DBA64E8C662F49 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
+			);
+			preferredProjectObjectVersion = 77;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				5A5CCF7AFE6B638827772F6C /* MagicDesktop */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		CDFB7CB2C141424E4F0377C3 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				718B72EA5237D3408B7F66B7 /* AppDelegate.swift in Sources */,
+				430DE1AA799C331AF2F633A1 /* BuildInstallService.swift in Sources */,
+				C55CC3137188FC0BD6C9D7C8 /* ConfigurationEditorView.swift in Sources */,
+				4B82FDB915DB8603C4099AE6 /* ConfigurationListView.swift in Sources */,
+				4DD565861B75C24E09E9E339 /* ConfigurationStore.swift in Sources */,
+				0887976CF17518F3C9AE4314 /* HotkeyService.swift in Sources */,
+				FDC0A5086A664EE5A672853B /* KeyboardShortcuts+Names.swift in Sources */,
+				2290690537BF666C9A0D9671 /* MagicDesktopApp.swift in Sources */,
+				02294E744D562E193B1896B3 /* MenuBarController.swift in Sources */,
+				63E3CF53F9C1ACA929192A67 /* SettingsView.swift in Sources */,
+				0FEC228A84CBDF58DB112AFD /* SpaceConfiguration.swift in Sources */,
+				BD6E7EBAD1778E4EBECDDB5D /* SpaceManager.swift in Sources */,
+				A276710645ADCA21C7FDD020 /* WindowManager.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		8C8906BAD546DC89DE6C4101 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		C6B5706C056F3804FCF8A680 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+		D2869A43C9FBBE7532C3C0F9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Debug;
+		};
+		FA051CBD59ED3E83BC37C88D /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 0.1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.10;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		1109BAEC82A95C098B88DFB8 /* Build configuration list for PBXProject "MagicDesktop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				8C8906BAD546DC89DE6C4101 /* Debug */,
+				C6B5706C056F3804FCF8A680 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		685219C32D37F9D81CF08ED2 /* Build configuration list for PBXNativeTarget "MagicDesktop" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				D2869A43C9FBBE7532C3C0F9 /* Debug */,
+				FA051CBD59ED3E83BC37C88D /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		AD46472C33DBA64E8C662F49 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.4.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		62B91CF7DC09092C84FB4404 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AD46472C33DBA64E8C662F49 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 45835D517F05BD2F62836A21 /* Project object */;
+}
