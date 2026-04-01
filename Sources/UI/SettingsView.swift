@@ -1,6 +1,42 @@
+import Observation
 import SwiftUI
 
+enum SettingsTab: Hashable {
+    case configurations
+    case buildInstall
+}
+
+@MainActor
+@Observable
+final class SettingsNavigationModel {
+    var selectedTab: SettingsTab = .configurations
+}
+
 struct SettingsView: View {
+    let navigation: SettingsNavigationModel
+    let store: ConfigurationStore
+
+    var body: some View {
+        @Bindable var navigation = navigation
+
+        TabView(selection: $navigation.selectedTab) {
+            ConfigurationListView(store: store)
+                .tabItem {
+                    Label("Configurations", systemImage: "rectangle.split.3x3")
+                }
+                .tag(SettingsTab.configurations)
+
+            BuildInstallSettingsView()
+                .tabItem {
+                    Label("Build", systemImage: "hammer")
+                }
+                .tag(SettingsTab.buildInstall)
+        }
+        .frame(minWidth: 820, minHeight: 540)
+    }
+}
+
+private struct BuildInstallSettingsView: View {
     @State private var buildService = BuildInstallService()
 
     var body: some View {
@@ -74,7 +110,7 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 600)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .padding()
     }
 }

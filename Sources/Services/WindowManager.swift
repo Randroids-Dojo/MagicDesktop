@@ -1,30 +1,90 @@
 import AppKit
 import ApplicationServices
+import OSLog
 
 enum WindowManager {
+    private static let logger = Logger(
+        subsystem: Bundle.main.bundleIdentifier ?? "MagicDesktop",
+        category: "WindowManager"
+    )
+    private static let accessibilitySettingsURL = URL(
+        string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
+    )
 
     // MARK: - Position & Capture
 
-    static func positionWindow(for app: NSRunningApplication, frame: WindowFrame) {
-        guard let window = targetWindow(for: app.processIdentifier) else { return }
-
-        var position = CGPoint(x: frame.x, y: frame.y)
-        var size = CGSize(width: frame.width, height: frame.height)
-
-        if let posValue = AXValueCreate(.cgPoint, &position) {
-            AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+    @discardableResult
+    static func ensureAccessibilityAccess(prompt: Bool) -> Bool {
+        let trusted: Bool
+        if prompt {
+            let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+            trusted = AXIsProcessTrustedWithOptions(options)
+        } else {
+            trusted = AXIsProcessTrusted()
         }
 
-        if let sizeValue = AXValueCreate(.cgSize, &size) {
-            AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        if !trusted {
+            logger.error("Accessibility permission is not granted for MagicDesktop. prompt=\(prompt)")
+            if prompt, let accessibilitySettingsURL {
+                NSWorkspace.shared.open(accessibilitySettingsURL)
+            }
         }
+
+        return trusted
     }
 
-    static func raiseWindow(for app: NSRunningApplication) {
-        guard let window = targetWindow(for: app.processIdentifier) else { return }
+    static func positionAndRaiseWindow(
+        for app: NSRunningApplication,
+        frame targetFrame: WindowFrame,
+        attempts: Int = 5
+    ) async {
+        let appRef = applicationElement(for: app.processIdentifier)
+        logger.debug(
+            "Starting move for pid=\(app.processIdentifier) bundle=\(app.bundleIdentifier ?? "unknown") target=\(describe(targetFrame)) attempts=\(attempts)"
+        )
 
-        _ = AXUIElementSetAttributeValue(window, kAXMainAttribute as CFString, kCFBooleanTrue)
-        _ = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+        for attempt in 0..<attempts {
+            _ = app.activate()
+            let frontmostResult = setBooleanAttribute(true, for: appRef, attribute: kAXFrontmostAttribute as CFString)
+            logger.debug("Attempt \(attempt + 1): activate requested; set frontmost result=\(frontmostResult.rawValue)")
+
+            guard let window = targetWindow(for: app.processIdentifier) else {
+                let summaries = windowSummaries(for: app.processIdentifier).joined(separator: " | ")
+                logger.error("Attempt \(attempt + 1): no target window for pid=\(app.processIdentifier). windows=\(summaries)")
+                if attempt < attempts - 1 {
+                    try? await Task.sleep(for: .milliseconds(120))
+                }
+                continue
+            }
+
+            logger.debug("Attempt \(attempt + 1): selected window \(windowSummary(window))")
+
+            let minimizedResult = setBooleanAttribute(false, for: window, attribute: kAXMinimizedAttribute as CFString)
+            let mainResult = setBooleanAttribute(true, for: window, attribute: kAXMainAttribute as CFString)
+            let focusedResult = setBooleanAttribute(true, for: window, attribute: kAXFocusedAttribute as CFString)
+            let frameResults = setFrame(targetFrame, for: window)
+            let raiseResult = AXUIElementPerformAction(window, kAXRaiseAction as CFString)
+
+            logger.debug(
+                "Attempt \(attempt + 1): AX results minimized=\(minimizedResult.rawValue) main=\(mainResult.rawValue) focused=\(focusedResult.rawValue) position=\(frameResults.position.rawValue) size=\(frameResults.size.rawValue) raise=\(raiseResult.rawValue)"
+            )
+
+            let actualFrame = currentFrame(for: window)
+            logger.debug("Attempt \(attempt + 1): observed frame \(actualFrame.map(describe) ?? "unavailable")")
+
+            if frameMatches(targetFrame, actual: actualFrame) {
+                logger.debug("Attempt \(attempt + 1): frame matched target")
+                return
+            }
+
+            if attempt < attempts - 1 {
+                try? await Task.sleep(for: .milliseconds(120))
+            }
+        }
+
+        logger.error(
+            "Failed to move pid=\(app.processIdentifier) bundle=\(app.bundleIdentifier ?? "unknown") to target=\(describe(targetFrame)) after \(attempts) attempts"
+        )
     }
 
     static func hasWindow(for app: NSRunningApplication) -> Bool {
@@ -33,7 +93,10 @@ enum WindowManager {
 
     static func captureCurrentFrame(for app: NSRunningApplication) -> WindowFrame? {
         guard let window = targetWindow(for: app.processIdentifier) else { return nil }
+        return currentFrame(for: window)
+    }
 
+    private static func currentFrame(for window: AXUIElement) -> WindowFrame? {
         var positionRef: CFTypeRef?
         var sizeRef: CFTypeRef?
 
@@ -57,6 +120,40 @@ enum WindowManager {
             width: size.width,
             height: size.height
         )
+    }
+
+    private static func frameMatches(_ expected: WindowFrame, actual: WindowFrame?, tolerance: Double = 8) -> Bool {
+        guard let actual else { return false }
+
+        return abs(expected.x - actual.x) <= tolerance
+            && abs(expected.y - actual.y) <= tolerance
+            && abs(expected.width - actual.width) <= tolerance
+            && abs(expected.height - actual.height) <= tolerance
+    }
+
+    private static func setFrame(_ frame: WindowFrame, for window: AXUIElement) -> (position: AXError, size: AXError) {
+        var position = CGPoint(x: frame.x, y: frame.y)
+        var size = CGSize(width: frame.width, height: frame.height)
+        var positionResult: AXError = .failure
+        var sizeResult: AXError = .failure
+
+        if let posValue = AXValueCreate(.cgPoint, &position) {
+            positionResult = AXUIElementSetAttributeValue(window, kAXPositionAttribute as CFString, posValue)
+        }
+
+        if let sizeValue = AXValueCreate(.cgSize, &size) {
+            sizeResult = AXUIElementSetAttributeValue(window, kAXSizeAttribute as CFString, sizeValue)
+        }
+
+        return (positionResult, sizeResult)
+    }
+
+    private static func setBooleanAttribute(
+        _ value: Bool,
+        for element: AXUIElement,
+        attribute: CFString
+    ) -> AXError {
+        AXUIElementSetAttributeValue(element, attribute, value ? kCFBooleanTrue : kCFBooleanFalse)
     }
 
     // MARK: - Display-Aware Capture
@@ -84,8 +181,15 @@ enum WindowManager {
 
     /// Converts a display-relative frame back to absolute AX coordinates for positioning.
     static func absoluteFrame(for frame: WindowFrame, on display: DisplayInfo) -> WindowFrame {
-        guard let screen = findMatchingScreen(for: display) else { return frame }
+        guard let screen = findMatchingScreen(for: display) else {
+            logger.error("Could not find matching screen for display=\(display.displayString); using stored frame \(describe(frame)) as absolute")
+            return frame
+        }
+
         let screenRect = axFrame(for: screen)
+        logger.debug(
+            "Mapping display=\(display.displayString) to screen='\(screen.localizedName)' cocoaFrame=\(NSStringFromRect(screen.frame)) axFrame=\(NSStringFromRect(screenRect))"
+        )
 
         return WindowFrame(
             x: screenRect.origin.x + frame.x,
@@ -113,7 +217,6 @@ enum WindowManager {
     static func findMatchingScreen(for display: DisplayInfo) -> NSScreen? {
         let screens = NSScreen.screens
 
-        // Exact match: same name and resolution
         if let match = screens.first(where: {
             $0.localizedName == display.name
                 && $0.frame.width == display.width
@@ -122,19 +225,16 @@ enum WindowManager {
             return match
         }
 
-        // Name match (resolution may have changed)
         if let match = screens.first(where: { $0.localizedName == display.name }) {
             return match
         }
 
-        // Resolution match
         if let match = screens.first(where: {
             $0.frame.width == display.width && $0.frame.height == display.height
         }) {
             return match
         }
 
-        // Fallback to main screen
         return screens.first
     }
 
@@ -160,7 +260,7 @@ enum WindowManager {
                 return screen
             }
         }
-        // Window center might be off-screen; find nearest screen
+
         return nearestScreen(to: point)
     }
 
@@ -188,8 +288,12 @@ enum WindowManager {
 
     // MARK: - AX Window
 
+    private static func applicationElement(for pid: pid_t) -> AXUIElement {
+        AXUIElementCreateApplication(pid)
+    }
+
     private static func targetWindow(for pid: pid_t) -> AXUIElement? {
-        let appRef = AXUIElementCreateApplication(pid)
+        let appRef = applicationElement(for: pid)
 
         if let focusedWindow = window(for: appRef, attribute: kAXFocusedWindowAttribute as CFString) {
             return focusedWindow
@@ -221,7 +325,6 @@ enum WindowManager {
         }
 
         let windows = axWindows(from: unsafeBitCast(value, to: CFArray.self))
-
         return windows.first(where: isStandardWindow) ?? windows.first
     }
 
@@ -239,5 +342,37 @@ enum WindowManager {
         let result = AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &value)
         guard result == .success, let subrole = value as? String else { return true }
         return subrole == kAXStandardWindowSubrole as String
+    }
+
+    private static func windowSummaries(for pid: pid_t) -> [String] {
+        let appRef = applicationElement(for: pid)
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &value)
+        guard result == .success,
+              let value,
+              CFGetTypeID(value) == CFArrayGetTypeID() else {
+            return []
+        }
+
+        return axWindows(from: unsafeBitCast(value, to: CFArray.self)).map(windowSummary)
+    }
+
+    private static func windowSummary(_ window: AXUIElement) -> String {
+        let title = stringAttribute(kAXTitleAttribute as CFString, from: window) ?? "<no-title>"
+        let role = stringAttribute(kAXRoleAttribute as CFString, from: window) ?? "<no-role>"
+        let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: window) ?? "<no-subrole>"
+        let frame = currentFrame(for: window).map(describe) ?? "unavailable"
+        return "title='\(title)' role=\(role) subrole=\(subrole) frame=\(frame)"
+    }
+
+    private static func stringAttribute(_ attribute: CFString, from element: AXUIElement) -> String? {
+        var value: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(element, attribute, &value)
+        guard result == .success, let string = value as? String else { return nil }
+        return string
+    }
+
+    private static func describe(_ frame: WindowFrame) -> String {
+        "(x: \(Int(frame.x)), y: \(Int(frame.y)), w: \(Int(frame.width)), h: \(Int(frame.height)))"
     }
 }

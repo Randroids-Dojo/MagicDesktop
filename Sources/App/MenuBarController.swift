@@ -5,11 +5,11 @@ import SwiftUI
 final class MenuBarController: NSObject, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private var menu: NSMenu!
-    private var configWindow: NSWindow?
     private var settingsWindow: NSWindow?
 
     private let configStore: ConfigurationStore
     private let spaceManager: SpaceManager
+    private let settingsNavigation = SettingsNavigationModel()
 
     init(configStore: ConfigurationStore, spaceManager: SpaceManager) {
         self.configStore = configStore
@@ -99,27 +99,27 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     @objc private func openConfigEditor() {
-        if let window = configWindow {
-            window.makeKeyAndOrderFront(nil)
-            NSApp.activate(ignoringOtherApps: true)
-            return
-        }
-
-        let view = ConfigurationListView(store: configStore)
-        configWindow = makeWindow(title: "Configurations", rootView: view, size: NSSize(width: 800, height: 500))
+        openSettingsWindow(selecting: .configurations)
     }
 
     @objc private func openSettings() {
+        openSettingsWindow(selecting: .buildInstall)
+    }
+
+    // MARK: - Window Helpers
+
+    private func openSettingsWindow(selecting tab: SettingsTab) {
+        settingsNavigation.selectedTab = tab
+
         if let window = settingsWindow {
             window.makeKeyAndOrderFront(nil)
             NSApp.activate(ignoringOtherApps: true)
             return
         }
 
-        settingsWindow = makeWindow(title: "MagicDesktop Settings", rootView: SettingsView(), size: NSSize(width: 520, height: 400))
+        let view = SettingsView(navigation: settingsNavigation, store: configStore)
+        settingsWindow = makeWindow(title: "MagicDesktop Settings", rootView: view, size: NSSize(width: 900, height: 600))
     }
-
-    // MARK: - Window Helpers
 
     private func makeWindow<V: View>(title: String, rootView: V, size: NSSize) -> NSWindow {
         let hostingController = NSHostingController(rootView: rootView)
@@ -139,7 +139,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         ) { [weak self] notification in
             guard let closedWindow = notification.object as? NSWindow else { return }
             Task { @MainActor in
-                if self?.configWindow === closedWindow { self?.configWindow = nil }
                 if self?.settingsWindow === closedWindow { self?.settingsWindow = nil }
             }
         }

@@ -25,14 +25,17 @@ open MagicDesktop.xcodeproj
 - `Sources/Services/WindowManager.swift`: Accessibility API window lookup, move/resize, raise, and display coordinate conversion.
 - `Sources/Models/SpaceConfiguration.swift`: saved layout model; frames are display-relative when `display` is set.
 - `Sources/UI/ConfigurationEditorView.swift`: capture/edit UI for saved app layouts.
+- `Sources/UI/SettingsView.swift`: shared tabbed settings window; contains the Configurations and Build tabs.
 - `Sources/Services/ConfigurationStore.swift`: JSON persistence at `~/Library/Application Support/MagicDesktop/configurations.json`.
 
 ## Change Guidance
 
+- Always increment the app version when making code changes. At minimum, bump `CURRENT_PROJECT_VERSION` in `project.yml`; bump `MARKETING_VERSION` too when the change is user-visible.
 - Preserve display-relative placement. Only treat frames as absolute when `layout.display == nil`.
 - Be careful with Accessibility timing. Newly launched apps may not expose a usable window immediately.
 - Window stacking is order-sensitive. The final position/raise pass follows `config.appLayouts` order so later items end up above earlier ones.
 - Do not assume every app exposes `kAXMainWindowAttribute`; fallback window lookup is intentional.
+- `Edit Configurations…` and `Settings…` open the same settings window and only differ by the selected tab.
 
 ## Verification
 

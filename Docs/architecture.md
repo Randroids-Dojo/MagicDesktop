@@ -21,7 +21,7 @@ Sources/
 ├── UI/
 │   ├── ConfigurationListView.swift  # NavigationSplitView sidebar + detail
 │   ├── ConfigurationEditorView.swift# Form editor, capture current layout
-│   └── SettingsView.swift           # Build & install controls
+│   └── SettingsView.swift           # Tabbed settings window for configurations + build/install
 └── Extensions/
     └── KeyboardShortcuts+Names.swift# Shortcut slot definitions (Ctrl+Opt+1–9)
 ```
@@ -32,16 +32,16 @@ Sources/
 Creates the shared `ConfigurationStore` and `SpaceManager`, then hands them to `MenuBarController` and `HotkeyService`.
 
 ### MenuBarController
-Owns the `NSStatusItem`. Rebuilds the menu dynamically via `NSMenuDelegate`. Manages the configuration editor and settings windows, observing close notifications to release references.
+Owns the `NSStatusItem`. Rebuilds the menu dynamically via `NSMenuDelegate`. Opens a shared settings window and selects either the Configurations or Build tab depending on which menu item was used.
 
 ### ConfigurationStore
 `@Observable` class backed by a JSON file in Application Support. Mutations go through `add`/`update`/`remove` methods that trigger a debounced (500ms) save.
 
 ### SpaceManager
-Activates a configuration by launching all apps concurrently via `TaskGroup`. For newly launched apps, it polls the Accessibility API at 100ms intervals (up to 5s) until a window appears before positioning.
+Activates a configuration by launching or resolving apps concurrently via `TaskGroup`, then applies the final move/raise pass in saved layout order so stacking is deterministic.
 
 ### WindowManager
-Stateless `enum` with static methods. Uses `kAXMainWindowAttribute` for single-element AX queries (avoids fetching the full window list). Provides both `positionWindow` and `captureCurrentFrame`.
+Stateless `enum` with static methods. Uses the macOS Accessibility API to find a target window, convert display-relative coordinates, and retry move/raise operations until the configured frame sticks.
 
 ## Dependencies
 

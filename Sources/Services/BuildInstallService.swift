@@ -189,6 +189,9 @@ final class BuildInstallService {
                 return
             }
 
+            state = .building("Stabilizing code signature...")
+            try await Self.stabilizeCodeSignature(at: builtAppURL, currentDirectoryURL: repositoryURL)
+
             state = .installing
             try Self.launchInstallerScript(from: builtAppURL, to: Self.installAppURL)
 
@@ -238,6 +241,10 @@ final class BuildInstallService {
         return AppVersion(shortVersion: shortVersion, buildVersion: buildVersion)
     }
 
+    private nonisolated static func bundleIdentifier(atBundleURL url: URL) -> String? {
+        Bundle(url: url)?.bundleIdentifier
+    }
+
     private nonisolated static func firstMatch(for pattern: String, in contents: String) -> String? {
         guard let regex = try? NSRegularExpression(pattern: pattern, options: [.anchorsMatchLines]) else {
             return nil
@@ -264,6 +271,36 @@ final class BuildInstallService {
             try fm.removeItem(at: url)
         }
         try fm.createDirectory(at: url, withIntermediateDirectories: true)
+    }
+
+    private nonisolated static func stabilizeCodeSignature(
+        at appURL: URL,
+        currentDirectoryURL: URL
+    ) async throws {
+        guard let bundleIdentifier = bundleIdentifier(atBundleURL: appURL) else {
+            throw BuildInstallError(
+                message: "Could not read the built app bundle identifier before install.",
+                outputSnippet: nil
+            )
+        }
+
+        _ = try await runCommand(
+            step: "codesign",
+            executableURL: URL(fileURLWithPath: "/usr/bin/codesign"),
+            arguments: [
+                "--force",
+                "--sign", "-",
+                "--deep",
+                "--preserve-metadata=entitlements,identifier,flags",
+                "--requirements", designatedRequirement(for: bundleIdentifier),
+                appURL.path,
+            ],
+            currentDirectoryURL: currentDirectoryURL
+        )
+    }
+
+    private nonisolated static func designatedRequirement(for bundleIdentifier: String) -> String {
+        "=designated => identifier \"\(bundleIdentifier)\""
     }
 
     private nonisolated static func findXcodegen() -> URL? {

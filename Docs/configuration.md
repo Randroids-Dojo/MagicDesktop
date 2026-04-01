@@ -5,7 +5,7 @@ A configuration defines a named set of apps and where their windows should be pl
 ## Creating a Configuration
 
 1. Click the MagicDesktop icon in the menu bar.
-2. Select **Edit Configurations...** (or press `Cmd+,`).
+2. Select **Edit Configurations...** (or press `Cmd+,`) to open the **Configurations** tab in the settings window.
 3. Click the **+** button in the sidebar.
 4. Give the configuration a name (e.g. "Dev Setup", "Writing").
 
@@ -46,6 +46,6 @@ Changes are persisted automatically with a short debounce so edits in the text f
 MagicDesktop will:
 1. Launch any apps that are not already running.
 2. Wait for each newly launched app to create a window.
-3. Move and resize all windows to the configured positions.
+3. Move, resize, and raise the target windows to the configured positions in saved layout order.
 
 Apps are launched concurrently, so a multi-app configuration activates quickly.
