@@ -21,9 +21,10 @@ Build and run from Xcode. MagicDesktop appears as an icon in the menu bar — th
 ## How It Works
 
 1. Create a **configuration** — a named set of apps and their window positions/sizes.
-2. Arrange the saved app order to control the final stacking order. Later items are raised later, so they end up above earlier items.
-3. Assign a **global shortcut** (defaults to Ctrl+Opt+1 through 9).
-4. Press the shortcut from anywhere — MagicDesktop launches any missing apps, activates running ones, and moves/resizes all windows to match.
+2. Use **Capture Running Apps** to snapshot your current setup, including which display each window belongs to. Multi-monitor captures are grouped in display-layout order and can be rearranged afterward.
+3. Arrange the saved app order to control the final stacking order. Later items are raised later, so they end up above earlier items.
+4. Assign a **global shortcut** (defaults to Ctrl+Opt+1 through 9).
+5. Press the shortcut from anywhere — MagicDesktop launches any missing apps, activates running ones, and moves/resizes all windows to match.
 
 You can also click any configuration by name in the menu bar dropdown.
 

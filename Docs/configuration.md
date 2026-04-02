@@ -17,7 +17,8 @@ Each configuration contains one or more **app layouts**. Each layout specifies:
 |-------|-------------|
 | **Bundle ID** | The app's bundle identifier (e.g. `com.apple.Safari`). |
 | **App Name** | A display label for the layout row. |
-| **X, Y** | The window's top-left origin in screen coordinates. |
+| **Display** | The monitor the window should be restored onto. |
+| **X, Y** | The window's top-left origin relative to that display. |
 | **W, H** | The window's width and height in points. |
 
 Click **Add App** to add a blank layout, then fill in the bundle ID and frame values.
@@ -38,7 +39,14 @@ Instead of entering values manually, click **Capture Running Apps**. This snapsh
 
 Capture is a convenient way to set things up once by hand and save the result.
 
-The captured order is just the order returned by macOS for the currently running apps. If you care about final stacking order, reorder the saved app list after capture.
+Multi-monitor capture behavior:
+
+- Each window is assigned to the display that contains the largest share of that window.
+- Captured apps are grouped in display-layout order, then by window position within each display.
+- The display picker and row summary show display placement hints such as `Built-in`, `Left`, `Right`, `Above`, or `Below`.
+- If MagicDesktop cannot confidently match a saved display, the row stays attached to that saved display and is marked `Unavailable`.
+
+Capture order is still editable. If you care about final stacking order, reorder the saved app list after capture.
 
 ## Storage
 

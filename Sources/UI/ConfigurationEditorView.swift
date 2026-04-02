@@ -8,6 +8,7 @@ struct ConfigurationEditorView: View {
     @State private var draggedLayoutID: AppLayout.ID?
     @State private var targetedInsertionIndex: Int?
     @State private var dragResetTask: Task<Void, Never>?
+    @State private var captureFeedback: CaptureFeedback?
 
     var body: some View {
         Form {
@@ -86,6 +87,12 @@ struct ConfigurationEditorView: View {
                     captureCurrentLayout()
                 }
                 .help("Captures the position and size of all currently visible app windows and records which display each one belongs to")
+
+                if let captureFeedback {
+                    Label(captureFeedback.message, systemImage: captureFeedback.systemImage)
+                        .font(.callout)
+                        .foregroundStyle(captureFeedback.color)
+                }
             }
         }
         .formStyle(.grouped)
@@ -93,23 +100,85 @@ struct ConfigurationEditorView: View {
     }
 
     private func captureCurrentLayout() {
+        guard WindowManager.ensureAccessibilityAccess(prompt: true) else {
+            captureFeedback = CaptureFeedback(
+                message: "Accessibility permission is required before MagicDesktop can capture window layouts.",
+                kind: .warning
+            )
+            return
+        }
+
         let workspace = NSWorkspace.shared
-        var layouts: [AppLayout] = []
+        var capturedLayouts: [CapturedLayout] = []
 
         for app in workspace.runningApplications where app.activationPolicy == .regular {
             guard let bundleID = app.bundleIdentifier else { continue }
             guard let result = WindowManager.captureDisplayRelativeLayout(for: app) else { continue }
-            guard result.frame.width > 0 && result.frame.height > 0 else { continue }
+            guard result.relativeFrame.width > 0 && result.relativeFrame.height > 0 else { continue }
 
-            layouts.append(AppLayout(
-                bundleIdentifier: bundleID,
-                appName: app.localizedName ?? bundleID,
-                frame: result.frame,
-                display: result.display
-            ))
+            capturedLayouts.append(
+                CapturedLayout(
+                    absoluteFrame: result.absoluteFrame,
+                    layout: AppLayout(
+                        bundleIdentifier: bundleID,
+                        appName: app.localizedName ?? bundleID,
+                        frame: result.relativeFrame,
+                        display: result.display
+                    )
+                )
+            )
         }
 
-        config.appLayouts = layouts
+        guard !capturedLayouts.isEmpty else {
+            captureFeedback = CaptureFeedback(
+                message: "No standard app windows were available to capture.",
+                kind: .warning
+            )
+            return
+        }
+
+        let displayOrder = Dictionary(
+            uniqueKeysWithValues: WindowManager.currentDisplays().enumerated().map { index, display in
+                (display, index)
+            }
+        )
+
+        let sortedLayouts = capturedLayouts.sorted { lhs, rhs in
+            let lhsDisplayIndex = displaySortIndex(for: lhs.layout.display, displayOrder: displayOrder)
+            let rhsDisplayIndex = displaySortIndex(for: rhs.layout.display, displayOrder: displayOrder)
+
+            if lhsDisplayIndex != rhsDisplayIndex {
+                return lhsDisplayIndex < rhsDisplayIndex
+            }
+
+            if lhs.absoluteFrame.y != rhs.absoluteFrame.y {
+                return lhs.absoluteFrame.y < rhs.absoluteFrame.y
+            }
+
+            if lhs.absoluteFrame.x != rhs.absoluteFrame.x {
+                return lhs.absoluteFrame.x < rhs.absoluteFrame.x
+            }
+
+            return lhs.layout.appName.localizedStandardCompare(rhs.layout.appName) == .orderedAscending
+        }
+
+        config.appLayouts = sortedLayouts.map(\.layout)
+
+        let displayCount = Set(sortedLayouts.compactMap(\.layout.display)).count
+        let displaySummary = displayCount == 1 ? "1 display" : "\(displayCount) displays"
+        let appSummary = sortedLayouts.count == 1 ? "1 app" : "\(sortedLayouts.count) apps"
+        captureFeedback = CaptureFeedback(
+            message: "Captured \(appSummary) across \(displaySummary). Reorder the list if you want a different front-to-back stacking order.",
+            kind: .success
+        )
+    }
+
+    private func displaySortIndex(
+        for display: DisplayInfo?,
+        displayOrder: [DisplayInfo: Int]
+    ) -> Int {
+        guard let display else { return Int.max }
+        return displayOrder[display] ?? Int.max
     }
 
     private func deleteLayout(id: AppLayout.ID) {
@@ -176,6 +245,39 @@ struct ConfigurationEditorView: View {
     }
 }
 
+private struct CapturedLayout {
+    let absoluteFrame: WindowFrame
+    let layout: AppLayout
+}
+
+private struct CaptureFeedback {
+    enum Kind {
+        case success
+        case warning
+    }
+
+    let message: String
+    let kind: Kind
+
+    var systemImage: String {
+        switch kind {
+        case .success:
+            "checkmark.circle.fill"
+        case .warning:
+            "exclamationmark.triangle.fill"
+        }
+    }
+
+    var color: Color {
+        switch kind {
+        case .success:
+            .green
+        case .warning:
+            .orange
+        }
+    }
+}
+
 // MARK: - App Layout Row
 
 struct AppLayoutRow: View {
@@ -205,8 +307,8 @@ struct AppLayoutRow: View {
 
             LabeledContent("Display") {
                 Picker("", selection: displaySelection) {
-                    ForEach(WindowManager.currentDisplays(), id: \.self) { display in
-                        Text(display.displayString).tag(display as DisplayInfo?)
+                    ForEach(availableDisplays, id: \.self) { display in
+                        Text(displayLabel(for: display)).tag(display as DisplayInfo?)
                     }
                 }
             }
@@ -308,9 +410,31 @@ struct AppLayoutRow: View {
 
     private var displaySelection: Binding<DisplayInfo?> {
         Binding(
-            get: { layout.display },
+            get: {
+                guard let display = layout.display else { return nil }
+                return WindowManager.connectedDisplayInfo(for: display) ?? display
+            },
             set: { layout.display = $0 }
         )
+    }
+
+    private var availableDisplays: [DisplayInfo] {
+        var displays = WindowManager.currentDisplays()
+
+        if let storedDisplay = layout.display,
+           WindowManager.connectedDisplayInfo(for: storedDisplay) == nil {
+            displays.append(storedDisplay)
+        }
+
+        return displays
+    }
+
+    private func displayLabel(for display: DisplayInfo) -> String {
+        if WindowManager.isDisplayConnected(display) {
+            return displayEditorLabel(for: display)
+        }
+
+        return "\(displayEditorLabel(for: display)) (\(unavailableDisplayLabel))"
     }
 }
 
@@ -325,11 +449,83 @@ private struct AppLayoutSummary: View {
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(layout.appName.isEmpty ? "Unnamed App" : layout.appName)
-                Text(layout.display?.displayString ?? "Unknown Display")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+
+                if let display = layout.display {
+                    HStack(spacing: 6) {
+                        Text(displayEditorLabel(for: display))
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+
+                        if !WindowManager.isDisplayConnected(display) {
+                            Text(unavailableDisplayLabel)
+                                .font(.caption2)
+                                .fontWeight(.semibold)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 2)
+                                .background(Color.orange.opacity(0.14), in: Capsule())
+                                .foregroundStyle(.orange)
+                        }
+                    }
+                } else {
+                    Text("Unknown Display")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
+    }
+}
+
+private let unavailableDisplayLabel = "Unavailable"
+
+private func displayEditorLabel(for display: DisplayInfo) -> String {
+    let resolvedDisplay = WindowManager.connectedDisplayInfo(for: display) ?? display
+    let detail = displayPlacementDetail(for: resolvedDisplay)
+
+    if let detail {
+        return "\(resolvedDisplay.displayString) • \(detail)"
+    }
+
+    return resolvedDisplay.displayString
+}
+
+private func displayPlacementDetail(for display: DisplayInfo) -> String? {
+    if display.isBuiltIn == true {
+        return "Built-in"
+    }
+
+    guard let originX = display.originX,
+          let originY = display.originY else {
+        return nil
+    }
+
+    let horizontal: String?
+    if originX < -1 {
+        horizontal = "Left"
+    } else if originX > 1 {
+        horizontal = "Right"
+    } else {
+        horizontal = nil
+    }
+
+    let vertical: String?
+    if originY > 1 {
+        vertical = "Above"
+    } else if originY < -1 {
+        vertical = "Below"
+    } else {
+        vertical = nil
+    }
+
+    switch (vertical, horizontal) {
+    case let (vertical?, horizontal?):
+        return "\(vertical) \(horizontal)"
+    case let (vertical?, nil):
+        return vertical
+    case let (nil, horizontal?):
+        return horizontal
+    case (nil, nil):
+        return "Primary Display"
     }
 }
 

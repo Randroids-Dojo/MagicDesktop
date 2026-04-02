@@ -17,9 +17,31 @@ struct SpaceConfiguration: Identifiable, Codable, Equatable {
 }
 
 struct DisplayInfo: Codable, Equatable, Hashable {
+    var uuid: String?
     var name: String
     var width: Double
     var height: Double
+    var originX: Double?
+    var originY: Double?
+    var isBuiltIn: Bool?
+
+    init(
+        uuid: String? = nil,
+        name: String,
+        width: Double,
+        height: Double,
+        originX: Double? = nil,
+        originY: Double? = nil,
+        isBuiltIn: Bool? = nil
+    ) {
+        self.uuid = uuid
+        self.name = name
+        self.width = width
+        self.height = height
+        self.originX = originX
+        self.originY = originY
+        self.isBuiltIn = isBuiltIn
+    }
 
     var displayString: String {
         "\(name) (\(Int(width))×\(Int(height)))"
