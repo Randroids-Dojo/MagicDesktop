@@ -40,6 +40,9 @@ Owns the `NSStatusItem`. Rebuilds the menu dynamically via `NSMenuDelegate`. Ope
 ### SpaceManager
 Activates a configuration by launching or resolving apps concurrently via `TaskGroup`, then applies the final move/raise pass in saved layout order so stacking is deterministic.
 
+### ConfigurationEditorView
+Edits the saved `appLayouts` array directly. Capture replaces the array from the current running apps, and drag-and-drop reordering updates that saved order so users can control final window stacking.
+
 ### WindowManager
 Stateless `enum` with static methods. Uses the macOS Accessibility API to find a target window, convert display-relative coordinates, and retry move/raise operations until the configured frame sticks.
 

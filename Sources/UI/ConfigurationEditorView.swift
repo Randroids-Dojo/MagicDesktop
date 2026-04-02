@@ -1,9 +1,13 @@
 import KeyboardShortcuts
 import SwiftUI
+import UniformTypeIdentifiers
 
 struct ConfigurationEditorView: View {
     @Binding var config: SpaceConfiguration
     let slotIndex: Int
+    @State private var draggedLayoutID: AppLayout.ID?
+    @State private var targetedInsertionIndex: Int?
+    @State private var dragResetTask: Task<Void, Never>?
 
     var body: some View {
         Form {
@@ -19,26 +23,53 @@ struct ConfigurationEditorView: View {
             }
 
             Section("App Layouts") {
-                let grouped = Dictionary(grouping: config.appLayouts) { layout in
-                    layout.display?.displayString ?? "Unknown Display"
-                }
+                Text("Drag apps into the exact order you want. Drop on an app to place the dragged app after it, or use the top line to place it first.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
 
-                ForEach(grouped.keys.sorted(), id: \.self) { displayName in
-                    Section {
-                        ForEach(grouped[displayName] ?? []) { layout in
-                            if let idx = config.appLayouts.firstIndex(where: { $0.id == layout.id }) {
-                                AppLayoutRow(layout: $config.appLayouts[idx])
+                if config.appLayouts.isEmpty {
+                    ContentUnavailableView(
+                        "No Apps Saved",
+                        systemImage: "rectangle.stack.badge.plus",
+                        description: Text("Capture your current windows or add apps manually.")
+                    )
+                } else {
+                    VStack(spacing: 0) {
+                        AppLayoutDropZone(
+                            targetIndex: 0,
+                            targetedInsertionIndex: $targetedInsertionIndex,
+                            onTargetingChanged: handleDropTargetChange,
+                            onDrop: moveDraggedLayout
+                        )
+
+                        ForEach(Array(config.appLayouts.enumerated()), id: \.element.id) { index, layout in
+                            if let bindingIndex = config.appLayouts.firstIndex(where: { $0.id == layout.id }) {
+                                AppLayoutRow(
+                                    layout: $config.appLayouts[bindingIndex],
+                                    isDragging: draggedLayoutID == layout.id,
+                                    isDropTargeted: targetedInsertionIndex == index + 1,
+                                    onDragStarted: { beginDragging(id: layout.id) },
+                                    onDelete: { deleteLayout(id: layout.id) }
+                                )
+                                .contentShape(Rectangle())
+                                .onDrop(
+                                    of: [UTType.plainText],
+                                    delegate: AppLayoutDropDelegate(
+                                        targetIndex: index + 1,
+                                        targetedInsertionIndex: $targetedInsertionIndex,
+                                        onTargetingChanged: handleDropTargetChange,
+                                        onDrop: moveDraggedLayout
+                                    )
+                                )
+
                             }
                         }
-                        .onDelete { offsets in
-                            let layoutsInGroup = grouped[displayName] ?? []
-                            let idsToRemove = offsets.map { layoutsInGroup[$0].id }
-                            config.appLayouts.removeAll { idsToRemove.contains($0.id) }
-                        }
-                    } header: {
-                        Label(displayName, systemImage: "display")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background {
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color(nsColor: .controlBackgroundColor))
                     }
                 }
 
@@ -54,7 +85,7 @@ struct ConfigurationEditorView: View {
                 Button("Capture Running Apps") {
                     captureCurrentLayout()
                 }
-                .help("Captures the position and size of all currently visible app windows, grouped by display")
+                .help("Captures the position and size of all currently visible app windows and records which display each one belongs to")
             }
         }
         .formStyle(.grouped)
@@ -80,12 +111,79 @@ struct ConfigurationEditorView: View {
 
         config.appLayouts = layouts
     }
+
+    private func deleteLayout(id: AppLayout.ID) {
+        config.appLayouts.removeAll { $0.id == id }
+    }
+
+    private func beginDragging(id: AppLayout.ID) {
+        dragResetTask?.cancel()
+        draggedLayoutID = id
+    }
+
+    private func handleDropTargetChange(isTargeted: Bool, at targetIndex: Int) {
+        if isTargeted {
+            dragResetTask?.cancel()
+            targetedInsertionIndex = targetIndex
+            return
+        }
+
+        if targetedInsertionIndex == targetIndex {
+            targetedInsertionIndex = nil
+            scheduleDragResetIfNeeded()
+        }
+    }
+
+    private func scheduleDragResetIfNeeded() {
+        dragResetTask?.cancel()
+
+        guard draggedLayoutID != nil else { return }
+
+        dragResetTask = Task {
+            try? await Task.sleep(for: .milliseconds(200))
+
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                if targetedInsertionIndex == nil {
+                    clearDragState()
+                }
+            }
+        }
+    }
+
+    private func clearDragState() {
+        dragResetTask?.cancel()
+        dragResetTask = nil
+        draggedLayoutID = nil
+        targetedInsertionIndex = nil
+    }
+
+    private func moveDraggedLayout(_ draggedID: AppLayout.ID, to targetIndex: Int) {
+        guard let sourceIndex = config.appLayouts.firstIndex(where: { $0.id == draggedID }) else {
+            clearDragState()
+            return
+        }
+
+        var destinationIndex = targetIndex
+        if sourceIndex < destinationIndex {
+            destinationIndex -= 1
+        }
+
+        let movedLayout = config.appLayouts.remove(at: sourceIndex)
+        let clampedDestination = min(max(destinationIndex, 0), config.appLayouts.count)
+        config.appLayouts.insert(movedLayout, at: clampedDestination)
+        clearDragState()
+    }
 }
 
 // MARK: - App Layout Row
 
 struct AppLayoutRow: View {
     @Binding var layout: AppLayout
+    let isDragging: Bool
+    let isDropTargeted: Bool
+    let onDragStarted: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
         DisclosureGroup {
@@ -137,11 +235,62 @@ struct AppLayoutRow: View {
             }
         } label: {
             HStack(spacing: 8) {
-                if let icon = InstalledApps.icon(for: layout.bundleIdentifier) {
-                    Image(nsImage: icon)
+                dragHandle
+                AppLayoutSummary(layout: layout)
+
+                Spacer()
+
+                Button(role: .destructive, action: onDelete) {
+                    Image(systemName: "trash")
                 }
-                Text(layout.appName.isEmpty ? "Unnamed App" : layout.appName)
+                .buttonStyle(.borderless)
+                .help("Remove app from this configuration")
             }
+            .padding(.vertical, 4)
+            .padding(.horizontal, 6)
+            .background {
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(
+                        Color.accentColor.opacity(
+                            isDragging ? 0.12 : (isDropTargeted ? 0.08 : 0)
+                        )
+                    )
+            }
+            .overlay {
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isDragging ? Color.accentColor.opacity(0.35) : (
+                            isDropTargeted ? Color.accentColor.opacity(0.2) : .clear
+                        ),
+                        style: StrokeStyle(
+                            lineWidth: 1,
+                            dash: isDragging ? [5, 4] : []
+                        )
+                    )
+            }
+            .opacity(isDragging ? 0.38 : 1)
+            .scaleEffect(isDragging ? 0.985 : 1)
+            .animation(.easeInOut(duration: 0.14), value: isDragging)
+            .animation(.easeInOut(duration: 0.14), value: isDropTargeted)
+        }
+    }
+
+    private var dragHandle: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color.secondary.opacity(0.08))
+
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+        }
+        .frame(width: 36, height: 30)
+        .contentShape(Rectangle())
+        .help("Drag to reorder")
+        .onDrag {
+            onDragStarted()
+            return NSItemProvider(object: layout.id.uuidString as NSString)
+        } preview: {
+            AppLayoutDragPreview(layout: layout)
         }
     }
 
@@ -162,6 +311,117 @@ struct AppLayoutRow: View {
             get: { layout.display },
             set: { layout.display = $0 }
         )
+    }
+}
+
+private struct AppLayoutSummary: View {
+    let layout: AppLayout
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let icon = InstalledApps.icon(for: layout.bundleIdentifier) {
+                Image(nsImage: icon)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(layout.appName.isEmpty ? "Unnamed App" : layout.appName)
+                Text(layout.display?.displayString ?? "Unknown Display")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+private struct AppLayoutDropZone: View {
+    let targetIndex: Int
+    @Binding var targetedInsertionIndex: Int?
+    let onTargetingChanged: (_ isTargeted: Bool, _ targetIndex: Int) -> Void
+    let onDrop: (_ draggedID: AppLayout.ID, _ targetIndex: Int) -> Void
+
+    var body: some View {
+        ZStack {
+            Capsule()
+                .fill(targetedInsertionIndex == targetIndex ? Color.accentColor : Color.secondary.opacity(0.18))
+                .frame(height: targetedInsertionIndex == targetIndex ? 5 : 1)
+        }
+        .frame(height: 12)
+        .contentShape(Rectangle())
+        .onDrop(
+            of: [UTType.plainText],
+            delegate: AppLayoutDropDelegate(
+                targetIndex: targetIndex,
+                targetedInsertionIndex: $targetedInsertionIndex,
+                onTargetingChanged: onTargetingChanged,
+                onDrop: onDrop
+            )
+        )
+    }
+}
+
+private struct AppLayoutDropDelegate: DropDelegate {
+    let targetIndex: Int
+    @Binding var targetedInsertionIndex: Int?
+    let onTargetingChanged: (_ isTargeted: Bool, _ targetIndex: Int) -> Void
+    let onDrop: (_ draggedID: AppLayout.ID, _ targetIndex: Int) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [UTType.plainText])
+    }
+
+    func dropEntered(info: DropInfo) {
+        onTargetingChanged(true, targetIndex)
+    }
+
+    func dropExited(info: DropInfo) {
+        onTargetingChanged(false, targetIndex)
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        DropProposal(operation: .move)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        targetedInsertionIndex = nil
+
+        guard let itemProvider = info.itemProviders(for: [UTType.plainText]).first else {
+            return false
+        }
+
+        itemProvider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let identifier = object as? NSString,
+                  let draggedID = UUID(uuidString: identifier as String) else {
+                return
+            }
+
+            Task { @MainActor in
+                onDrop(draggedID, targetIndex)
+            }
+        }
+
+        return true
+    }
+}
+
+private struct AppLayoutDragPreview: View {
+    let layout: AppLayout
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "line.3.horizontal")
+                .foregroundStyle(.secondary)
+
+            AppLayoutSummary(layout: layout)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 12))
+        .overlay {
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(Color.accentColor.opacity(0.25), lineWidth: 1)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 10, y: 4)
+        .frame(minWidth: 220, alignment: .leading)
     }
 }
 

@@ -22,11 +22,23 @@ Each configuration contains one or more **app layouts**. Each layout specifies:
 
 Click **Add App** to add a blank layout, then fill in the bundle ID and frame values.
 
+## Reordering Apps
+
+The order of apps in a configuration matters.
+
+- MagicDesktop applies the final move/raise pass in saved app order.
+- Later items are raised later, so they end up above earlier items.
+- In the editor, drag the handle on a row to reorder it.
+- Drop on an app row to place the dragged app after that item.
+- Drop on the top insertion line to place the dragged app first.
+
 ## Capturing the Current Layout
 
 Instead of entering values manually, click **Capture Running Apps**. This snapshots every visible app's current window position and size into the configuration, replacing any existing layouts.
 
 Capture is a convenient way to set things up once by hand and save the result.
+
+The captured order is just the order returned by macOS for the currently running apps. If you care about final stacking order, reorder the saved app list after capture.
 
 ## Storage
 
