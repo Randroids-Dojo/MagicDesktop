@@ -29,9 +29,10 @@ The order of apps in a configuration matters.
 
 - MagicDesktop applies the final move/raise pass in saved app order.
 - Later items are raised later, so they end up above earlier items.
+- The editor groups saved apps by display so each screen has its own list.
 - In the editor, drag the handle on a row to reorder it.
 - Drop on an app row to place the dragged app after that item.
-- Drop on the top insertion line to place the dragged app first.
+- Use the top insertion line inside a display section to place the dragged app first on that display.
 
 ## Capturing the Current Layout
 

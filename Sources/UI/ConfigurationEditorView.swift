@@ -24,7 +24,7 @@ struct ConfigurationEditorView: View {
             }
 
             Section("App Layouts") {
-                Text("Drag apps into the exact order you want. Drop on an app to place the dragged app after it, or use the top line to place it first.")
+                Text("Apps are grouped by display. Drag within a display to control the front-to-back order for that screen.")
                     .font(.callout)
                     .foregroundStyle(.secondary)
 
@@ -35,42 +35,53 @@ struct ConfigurationEditorView: View {
                         description: Text("Capture your current windows or add apps manually.")
                     )
                 } else {
-                    VStack(spacing: 0) {
-                        AppLayoutDropZone(
-                            targetIndex: 0,
-                            targetedInsertionIndex: $targetedInsertionIndex,
-                            onTargetingChanged: handleDropTargetChange,
-                            onDrop: moveDraggedLayout
-                        )
+                    VStack(spacing: 14) {
+                        ForEach(displaySections) { section in
+                            VStack(spacing: 0) {
+                                AppLayoutSectionHeader(section: section)
+                                    .padding(.horizontal, 14)
+                                    .padding(.top, 12)
+                                    .padding(.bottom, 8)
 
-                        ForEach(Array(config.appLayouts.enumerated()), id: \.element.id) { index, layout in
-                            if let bindingIndex = config.appLayouts.firstIndex(where: { $0.id == layout.id }) {
-                                AppLayoutRow(
-                                    layout: $config.appLayouts[bindingIndex],
-                                    isDragging: draggedLayoutID == layout.id,
-                                    isDropTargeted: targetedInsertionIndex == index + 1,
-                                    onDragStarted: { beginDragging(id: layout.id) },
-                                    onDelete: { deleteLayout(id: layout.id) }
+                                AppLayoutDropZone(
+                                    targetIndex: section.startIndex,
+                                    targetedInsertionIndex: $targetedInsertionIndex,
+                                    isEnabled: canDrop(into: section.display),
+                                    onTargetingChanged: handleDropTargetChange,
+                                    onDrop: moveDraggedLayout
                                 )
-                                .contentShape(Rectangle())
-                                .onDrop(
-                                    of: [UTType.plainText],
-                                    delegate: AppLayoutDropDelegate(
-                                        targetIndex: index + 1,
-                                        targetedInsertionIndex: $targetedInsertionIndex,
-                                        onTargetingChanged: handleDropTargetChange,
-                                        onDrop: moveDraggedLayout
-                                    )
-                                )
+                                .padding(.horizontal, 14)
 
+                                ForEach(section.layouts) { item in
+                                    if let bindingIndex = config.appLayouts.firstIndex(where: { $0.id == item.layout.id }) {
+                                        AppLayoutRow(
+                                            layout: $config.appLayouts[bindingIndex],
+                                            isDragging: draggedLayoutID == item.layout.id,
+                                            isDropTargeted: targetedInsertionIndex == item.storageIndex + 1,
+                                            onDragStarted: { beginDragging(id: item.layout.id) },
+                                            onDelete: { deleteLayout(id: item.layout.id) }
+                                        )
+                                        .contentShape(Rectangle())
+                                        .padding(.horizontal, 12)
+                                        .onDrop(
+                                            of: [UTType.plainText],
+                                            delegate: AppLayoutDropDelegate(
+                                                targetIndex: item.storageIndex + 1,
+                                                targetedInsertionIndex: $targetedInsertionIndex,
+                                                isEnabled: canDrop(into: section.display),
+                                                onTargetingChanged: handleDropTargetChange,
+                                                onDrop: moveDraggedLayout
+                                            )
+                                        )
+                                    }
+                                }
+                            }
+                            .padding(.bottom, 10)
+                            .background {
+                                RoundedRectangle(cornerRadius: 14)
+                                    .fill(Color(nsColor: .controlBackgroundColor))
                             }
                         }
-                    }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 10)
-                    .background {
-                        RoundedRectangle(cornerRadius: 14)
-                            .fill(Color(nsColor: .controlBackgroundColor))
                     }
                 }
 
@@ -243,6 +254,50 @@ struct ConfigurationEditorView: View {
         config.appLayouts.insert(movedLayout, at: clampedDestination)
         clearDragState()
     }
+
+    private var displaySections: [AppLayoutSection] {
+        let currentDisplayOrder = WindowManager.currentDisplays().map { DisplaySectionKey(display: $0) }
+        var groupedItems: [DisplaySectionKey: [IndexedAppLayout]] = [:]
+        var extraKeys: [DisplaySectionKey] = []
+
+        for (storageIndex, layout) in config.appLayouts.enumerated() {
+            let key = DisplaySectionKey(display: sectionDisplay(for: layout.display))
+
+            if groupedItems[key] == nil,
+               !currentDisplayOrder.contains(key),
+               !extraKeys.contains(key) {
+                extraKeys.append(key)
+            }
+
+            groupedItems[key, default: []].append(
+                IndexedAppLayout(
+                    storageIndex: storageIndex,
+                    layout: layout
+                )
+            )
+        }
+
+        let orderedKeys = currentDisplayOrder.filter { groupedItems[$0] != nil } + extraKeys
+
+        return orderedKeys.compactMap { key in
+            guard let layouts = groupedItems[key], !layouts.isEmpty else { return nil }
+            return AppLayoutSection(display: key.display, layouts: layouts)
+        }
+    }
+
+    private func canDrop(into display: DisplayInfo?) -> Bool {
+        guard let draggedLayoutID,
+              let draggedLayout = config.appLayouts.first(where: { $0.id == draggedLayoutID }) else {
+            return true
+        }
+
+        return sectionDisplay(for: draggedLayout.display) == display
+    }
+
+    private func sectionDisplay(for display: DisplayInfo?) -> DisplayInfo? {
+        guard let display else { return nil }
+        return WindowManager.connectedDisplayInfo(for: display) ?? display
+    }
 }
 
 private struct CapturedLayout {
@@ -275,6 +330,74 @@ private struct CaptureFeedback {
         case .warning:
             .orange
         }
+    }
+}
+
+private struct IndexedAppLayout: Identifiable {
+    let storageIndex: Int
+    let layout: AppLayout
+
+    var id: AppLayout.ID { layout.id }
+}
+
+private struct DisplaySectionKey: Hashable {
+    let display: DisplayInfo?
+}
+
+private struct AppLayoutSection: Identifiable {
+    let display: DisplayInfo?
+    let layouts: [IndexedAppLayout]
+
+    var id: String {
+        if let display {
+            displaySectionIdentifier(for: display)
+        } else {
+            "no-display"
+        }
+    }
+
+    var startIndex: Int {
+        layouts.map(\.storageIndex).min() ?? 0
+    }
+}
+
+private struct AppLayoutSectionHeader: View {
+    let section: AppLayoutSection
+
+    var body: some View {
+        HStack(alignment: .center) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(sectionTitle)
+                    .font(.headline)
+
+                Text(appCountLabel)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            if let display = section.display,
+               !WindowManager.isDisplayConnected(display) {
+                Text(unavailableDisplayLabel)
+                    .font(.caption2)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.orange.opacity(0.14), in: Capsule())
+                    .foregroundStyle(.orange)
+            }
+        }
+    }
+
+    private var sectionTitle: String {
+        guard let display = section.display else { return "No Display" }
+        return displayEditorLabel(for: display)
+    }
+
+    private var appCountLabel: String {
+        let count = section.layouts.count
+        return count == 1 ? "1 app" : "\(count) apps"
     }
 }
 
@@ -478,6 +601,21 @@ private struct AppLayoutSummary: View {
 
 private let unavailableDisplayLabel = "Unavailable"
 
+private func displaySectionIdentifier(for display: DisplayInfo) -> String {
+    if let uuid = display.uuid {
+        return uuid
+    }
+
+    return [
+        display.name,
+        String(Int(display.width)),
+        String(Int(display.height)),
+        String(display.originX ?? 0),
+        String(display.originY ?? 0),
+        String(display.isBuiltIn ?? false),
+    ].joined(separator: "|")
+}
+
 private func displayEditorLabel(for display: DisplayInfo) -> String {
     let resolvedDisplay = WindowManager.connectedDisplayInfo(for: display) ?? display
     let detail = displayPlacementDetail(for: resolvedDisplay)
@@ -532,6 +670,7 @@ private func displayPlacementDetail(for display: DisplayInfo) -> String? {
 private struct AppLayoutDropZone: View {
     let targetIndex: Int
     @Binding var targetedInsertionIndex: Int?
+    let isEnabled: Bool
     let onTargetingChanged: (_ isTargeted: Bool, _ targetIndex: Int) -> Void
     let onDrop: (_ draggedID: AppLayout.ID, _ targetIndex: Int) -> Void
 
@@ -548,6 +687,7 @@ private struct AppLayoutDropZone: View {
             delegate: AppLayoutDropDelegate(
                 targetIndex: targetIndex,
                 targetedInsertionIndex: $targetedInsertionIndex,
+                isEnabled: isEnabled,
                 onTargetingChanged: onTargetingChanged,
                 onDrop: onDrop
             )
@@ -558,26 +698,31 @@ private struct AppLayoutDropZone: View {
 private struct AppLayoutDropDelegate: DropDelegate {
     let targetIndex: Int
     @Binding var targetedInsertionIndex: Int?
+    let isEnabled: Bool
     let onTargetingChanged: (_ isTargeted: Bool, _ targetIndex: Int) -> Void
     let onDrop: (_ draggedID: AppLayout.ID, _ targetIndex: Int) -> Void
 
     func validateDrop(info: DropInfo) -> Bool {
-        info.hasItemsConforming(to: [UTType.plainText])
+        isEnabled && info.hasItemsConforming(to: [UTType.plainText])
     }
 
     func dropEntered(info: DropInfo) {
+        guard isEnabled else { return }
         onTargetingChanged(true, targetIndex)
     }
 
     func dropExited(info: DropInfo) {
+        guard isEnabled else { return }
         onTargetingChanged(false, targetIndex)
     }
 
     func dropUpdated(info: DropInfo) -> DropProposal? {
-        DropProposal(operation: .move)
+        guard isEnabled else { return nil }
+        return DropProposal(operation: .move)
     }
 
     func performDrop(info: DropInfo) -> Bool {
+        guard isEnabled else { return false }
         targetedInsertionIndex = nil
 
         guard let itemProvider = info.itemProviders(for: [UTType.plainText]).first else {
