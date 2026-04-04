@@ -32,7 +32,7 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.buildInstall)
         }
-        .frame(minWidth: 820, minHeight: 540)
+        .frame(minWidth: 1100, minHeight: 700)
     }
 }
 

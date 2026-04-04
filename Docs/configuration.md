@@ -21,7 +21,13 @@ Each configuration contains one or more **app layouts**. Each layout specifies:
 | **X, Y** | The window's top-left origin relative to that display. |
 | **W, H** | The window's width and height in points. |
 
-Click **Add App** to add a blank layout, then fill in the bundle ID and frame values.
+The main editor is display-first:
+
+- Click a monitor in the overview to open that display's workspace inline.
+- Use **Capture All Displays** at the top of Display Setup when you want to rebuild the full configuration from what is currently open.
+- Use the app picker on the right to add or move an app onto the selected display.
+- Drag windows on the canvas to place them visually.
+- Use **Capture Current Display** inside the selected display workspace when you want to replace only that screen.
 
 ## Reordering Apps
 
@@ -33,6 +39,19 @@ The order of apps in a configuration matters.
 - In the editor, drag the handle on a row to reorder it.
 - Drop on an app row to place the dragged app after that item.
 - Use the top insertion line inside a display section to place the dragged app first on that display.
+
+## Visual Display Editor
+
+The Configurations tab shows a scaled overview of every currently connected display and uses the selected display workspace as the main setup flow.
+
+- Each monitor card preserves that display's relative size and position.
+- Selecting a monitor opens an inline workspace for that display.
+- The canvas shows the apps assigned to that screen as draggable, resizable windows.
+- The app list on the right supports drag-and-drop reordering for stacking, app removal, and app selection.
+- Changes made in the canvas update the saved display-relative coordinates directly.
+- If saved layouts belong to displays that are no longer connected, the editor shows a maintenance notice instead of a second editing surface.
+
+The visual editor works in the same display-relative coordinate system used by MagicDesktop at activation time, so the saved layout remains portable across monitor arrangements.
 
 ## Capturing the Current Layout
 
@@ -46,6 +65,7 @@ Multi-monitor capture behavior:
 - Captured apps are grouped in display-layout order, then by window position within each display.
 - The display picker and row summary show display placement hints such as `Built-in`, `Left`, `Right`, `Above`, or `Below`.
 - If MagicDesktop cannot confidently match a saved display, the row stays attached to that saved display and is marked `Unavailable`.
+- The selected display workspace also includes **Capture Current Display**, which replaces only that screen's saved layouts and leaves other displays untouched.
 
 Capture order is still editable. If you care about final stacking order, reorder the saved app list after capture.
 

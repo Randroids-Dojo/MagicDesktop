@@ -3,9 +3,10 @@ import SwiftUI
 struct ConfigurationListView: View {
     @Bindable var store: ConfigurationStore
     @State private var selection: SpaceConfiguration.ID?
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
     var body: some View {
-        NavigationSplitView {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             List(selection: $selection) {
                 ForEach(store.configurations) { config in
                     NavigationLink(value: config.id) {
@@ -23,7 +24,7 @@ struct ConfigurationListView: View {
                     store.remove(at: offsets)
                 }
             }
-            .navigationSplitViewColumnWidth(min: 180, ideal: 220)
+            .navigationSplitViewColumnWidth(min: 160, ideal: 190)
             .toolbar {
                 ToolbarItem(placement: .destructiveAction) {
                     Button(action: deleteSelection) {
@@ -65,6 +66,14 @@ struct ConfigurationListView: View {
                     .foregroundStyle(.secondary)
             }
         }
+        .toolbar {
+            ToolbarItem(placement: .navigation) {
+                Button(action: toggleSidebar) {
+                    Image(systemName: "sidebar.left")
+                }
+                .help(columnVisibility == .detailOnly ? "Show configurations list" : "Hide configurations list")
+            }
+        }
     }
 
     private func addConfiguration() {
@@ -77,5 +86,9 @@ struct ConfigurationListView: View {
         guard let id = selection else { return }
         selection = nil
         store.remove(id: id)
+    }
+
+    private func toggleSidebar() {
+        columnVisibility = columnVisibility == .detailOnly ? .all : .detailOnly
     }
 }

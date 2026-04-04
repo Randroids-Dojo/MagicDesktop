@@ -40,5 +40,6 @@ open MagicDesktop.xcodeproj
 ## Verification
 
 - There are no automated tests in this repo today.
-- Always run an `xcodebuild` compile check after code changes.
+- After code changes, always build and re-install MagicDesktop, then relaunch it. Do not stop at an `xcodebuild` compile check unless the re-install step fails.
+- Prefer the same workflow as `BuildInstallService`: build the app, install it to `/Applications/MagicDesktop.app`, and reopen it so the running app matches the repo version.
 - For window-management changes, manually verify on a multi-monitor setup with Accessibility permission enabled.
