@@ -8,6 +8,7 @@ enum WindowManager {
         subsystem: Bundle.main.bundleIdentifier ?? "MagicDesktop",
         category: "WindowManager"
     )
+    private static let finderBundleIdentifier = "com.apple.finder"
     private static let accessibilitySettingsURL = URL(
         string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility"
     )
@@ -426,16 +427,35 @@ enum WindowManager {
 
     private static func targetWindow(for pid: pid_t) -> AXUIElement? {
         let appRef = applicationElement(for: pid)
+        let windows = windows(for: appRef)
 
-        if let focusedWindow = window(for: appRef, attribute: kAXFocusedWindowAttribute as CFString) {
+        if let focusedWindow = window(for: appRef, attribute: kAXFocusedWindowAttribute as CFString),
+           hasPositiveFrame(focusedWindow) {
             return focusedWindow
         }
 
-        if let mainWindow = window(for: appRef, attribute: kAXMainWindowAttribute as CFString) {
+        if let mainWindow = window(for: appRef, attribute: kAXMainWindowAttribute as CFString),
+           hasPositiveFrame(mainWindow) {
             return mainWindow
         }
 
-        return firstStandardWindow(for: appRef)
+        if let standardWindow = windows.first(where: isStandardWindow) {
+            return standardWindow
+        }
+
+        if let windowRoleWindow = windows.first(where: isWindowRoleWindow) {
+            return windowRoleWindow
+        }
+
+        if let titledWindow = windows.first(where: isTitledWindow) {
+            return titledWindow
+        }
+
+        if isFinder(pid: pid) {
+            return nil
+        }
+
+        return windows.first(where: hasPositiveFrame)
     }
 
     private static func window(for appRef: AXUIElement, attribute: CFString) -> AXUIElement? {
@@ -447,17 +467,16 @@ enum WindowManager {
         return unsafeBitCast(value, to: AXUIElement.self)
     }
 
-    private static func firstStandardWindow(for appRef: AXUIElement) -> AXUIElement? {
+    private static func windows(for appRef: AXUIElement) -> [AXUIElement] {
         var value: CFTypeRef?
         let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &value)
         guard result == .success,
               let value,
               CFGetTypeID(value) == CFArrayGetTypeID() else {
-            return nil
+            return []
         }
 
-        let windows = axWindows(from: unsafeBitCast(value, to: CFArray.self))
-        return windows.first(where: isStandardWindow) ?? windows.first
+        return axWindows(from: unsafeBitCast(value, to: CFArray.self))
     }
 
     private static func axWindows(from array: CFArray) -> [AXUIElement] {
@@ -470,10 +489,29 @@ enum WindowManager {
     }
 
     private static func isStandardWindow(_ window: AXUIElement) -> Bool {
-        var value: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(window, kAXSubroleAttribute as CFString, &value)
-        guard result == .success, let subrole = value as? String else { return true }
+        guard hasPositiveFrame(window) else { return false }
+        guard let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: window) else { return false }
         return subrole == kAXStandardWindowSubrole as String
+    }
+
+    private static func isWindowRoleWindow(_ window: AXUIElement) -> Bool {
+        guard hasPositiveFrame(window) else { return false }
+        return stringAttribute(kAXRoleAttribute as CFString, from: window) == kAXWindowRole as String
+    }
+
+    private static func isTitledWindow(_ window: AXUIElement) -> Bool {
+        guard hasPositiveFrame(window) else { return false }
+        guard let title = stringAttribute(kAXTitleAttribute as CFString, from: window) else { return false }
+        return !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private static func hasPositiveFrame(_ window: AXUIElement) -> Bool {
+        guard let frame = currentFrame(for: window) else { return false }
+        return frame.width > 0 && frame.height > 0
+    }
+
+    private static func isFinder(pid: pid_t) -> Bool {
+        NSRunningApplication(processIdentifier: pid)?.bundleIdentifier == finderBundleIdentifier
     }
 
     private static func windowSummaries(for pid: pid_t) -> [String] {

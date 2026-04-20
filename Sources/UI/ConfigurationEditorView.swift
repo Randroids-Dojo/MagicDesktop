@@ -235,7 +235,7 @@ struct ConfigurationEditorView: View {
         let workspace = NSWorkspace.shared
         var capturedLayouts: [CapturedLayout] = []
 
-        for app in workspace.runningApplications where app.activationPolicy == .regular {
+        for app in runningApplicationsForCapture(in: workspace) {
             guard let bundleID = app.bundleIdentifier else { continue }
             guard let result = WindowManager.captureDisplayRelativeLayout(for: app) else { continue }
             guard result.relativeFrame.width > 0 && result.relativeFrame.height > 0 else { continue }
@@ -303,6 +303,18 @@ struct ConfigurationEditorView: View {
     ) -> Int {
         guard let display else { return Int.max }
         return displayOrder[display] ?? Int.max
+    }
+
+    private func runningApplicationsForCapture(in workspace: NSWorkspace) -> [NSRunningApplication] {
+        let currentAppBundleIdentifier = Bundle.main.bundleIdentifier
+        let finderBundleIdentifier = "com.apple.finder"
+
+        return workspace.runningApplications.filter { app in
+            guard let bundleIdentifier = app.bundleIdentifier else { return false }
+            guard bundleIdentifier != currentAppBundleIdentifier else { return false }
+            guard !app.isHidden, !app.isTerminated else { return false }
+            return app.activationPolicy == .regular || bundleIdentifier == finderBundleIdentifier
+        }
     }
 
     private func deleteLayout(id: AppLayout.ID) {
@@ -603,7 +615,7 @@ struct ConfigurationEditorView: View {
         let workspace = NSWorkspace.shared
         var capturedLayouts: [CapturedLayout] = []
 
-        for app in workspace.runningApplications where app.activationPolicy == .regular {
+        for app in runningApplicationsForCapture(in: workspace) {
             guard let bundleID = app.bundleIdentifier else { continue }
             guard let result = WindowManager.captureDisplayRelativeLayout(for: app) else { continue }
             guard sectionDisplay(for: result.display) == display else { continue }

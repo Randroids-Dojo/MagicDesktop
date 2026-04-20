@@ -3,6 +3,8 @@ import OSLog
 
 @MainActor
 final class SpaceManager {
+    private static let finderBundleIdentifier = "com.apple.finder"
+
     private let logger = Logger(
         subsystem: Bundle.main.bundleIdentifier ?? "MagicDesktop",
         category: "SpaceManager"
@@ -68,6 +70,7 @@ final class SpaceManager {
             logger.debug(
                 "Using running app '\(layout.appName)' bundle=\(layout.bundleIdentifier) pid=\(app.processIdentifier) resolvedFrame=\(Self.describe(frame))"
             )
+            await ensureRestorableWindow(for: app, layout: layout, workspace: workspace)
             return PreparedLayout(index: index, app: app, frame: frame, layout: layout)
         } else {
             guard let appURL = workspace.urlForApplication(withBundleIdentifier: layout.bundleIdentifier) else {
@@ -84,7 +87,11 @@ final class SpaceManager {
                     at: appURL,
                     configuration: configuration
                 )
-                await waitForWindow(app: app)
+                if layout.bundleIdentifier == Self.finderBundleIdentifier {
+                    await ensureRestorableWindow(for: app, layout: layout, workspace: workspace)
+                } else {
+                    await waitForWindow(app: app)
+                }
                 logger.debug("Launched app bundle=\(layout.bundleIdentifier) pid=\(app.processIdentifier) resolvedFrame=\(Self.describe(frame))")
                 return PreparedLayout(index: index, app: app, frame: frame, layout: layout)
             } catch {
@@ -116,6 +123,23 @@ final class SpaceManager {
         }
 
         logger.error("Timed out waiting for window for pid=\(app.processIdentifier)")
+    }
+
+    private func ensureRestorableWindow(
+        for app: NSRunningApplication,
+        layout: AppLayout,
+        workspace: NSWorkspace
+    ) async {
+        guard layout.bundleIdentifier == Self.finderBundleIdentifier else { return }
+        guard !WindowManager.hasWindow(for: app) else { return }
+
+        let homeURL = FileManager.default.homeDirectoryForCurrentUser.standardizedFileURL
+        logger.debug(
+            "Finder has no browser window for saved layout '\(layout.appName)'; opening \(homeURL.path) so the window can be restored"
+        )
+
+        _ = workspace.open(homeURL)
+        await waitForWindow(app: app)
     }
 
     private static func describe(_ frame: WindowFrame) -> String {
