@@ -22,21 +22,24 @@ struct ConfigurationEditorView: View {
     @State private var selectedDisplayID: String?
 
     var body: some View {
-        VStack(spacing: 0) {
-            headerBar
-                .padding(.horizontal, 28)
-                .padding(.top, 24)
-                .padding(.bottom, 18)
+        ScrollView(.vertical) {
+            VStack(spacing: 0) {
+                headerBar
+                    .padding(.horizontal, 28)
+                    .padding(.top, 24)
+                    .padding(.bottom, 18)
 
-            Divider()
+                Divider()
 
-            desktopBar
-                .padding(.horizontal, 28)
-                .padding(.vertical, 14)
+                desktopBar
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 14)
 
-            Divider()
+                Divider()
 
-            workspace
+                workspace
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
         }
         .background(Color(nsColor: .windowBackgroundColor))
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -65,12 +68,12 @@ struct ConfigurationEditorView: View {
                     .textFieldStyle(.plain)
                     .font(.system(size: 24, weight: .semibold))
                     .lineLimit(1)
+                    .frame(maxWidth: 360, alignment: .leading)
 
                 Text(summaryLine)
                     .font(.callout)
                     .foregroundStyle(.secondary)
             }
-            .layoutPriority(1)
 
             Spacer(minLength: 16)
 
@@ -81,7 +84,11 @@ struct ConfigurationEditorView: View {
             Button {
                 captureCurrentLayout()
             } label: {
-                Label("Capture Windows", systemImage: "camera.viewfinder")
+                HStack(spacing: 6) {
+                    Image(systemName: "camera.viewfinder")
+                    Text("Capture Windows")
+                }
+                .fixedSize()
             }
             .buttonStyle(.bordered)
             .controlSize(.large)
@@ -90,7 +97,13 @@ struct ConfigurationEditorView: View {
             Button {
                 onActivate(config)
             } label: {
-                Label("Run", systemImage: "play.fill")
+                HStack(spacing: 6) {
+                    Image(systemName: "play.fill")
+                    Text("Run")
+                        .fontWeight(.semibold)
+                }
+                .padding(.horizontal, 4)
+                .fixedSize()
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
@@ -105,6 +118,7 @@ struct ConfigurationEditorView: View {
                 .foregroundStyle(.secondary)
             KeyboardShortcuts.Recorder("Shortcut", name: .spaceSlot(slotIndex))
                 .labelsHidden()
+                .fixedSize()
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 4)
@@ -257,75 +271,71 @@ struct ConfigurationEditorView: View {
                 systemImage: "display.trianglebadge.exclamationmark",
                 description: Text("Connect a display to edit window layouts.")
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 400)
         } else if selectedDesktop == nil {
             ContentUnavailableView(
                 "No Desktop Selected",
                 systemImage: "rectangle.stack",
                 description: Text("Create or select a desktop above to edit its layout.")
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 400)
         } else {
-            GeometryReader { geometry in
-                VStack(alignment: .leading, spacing: 14) {
-                    ConnectedDisplaysOverview(
-                        displays: connectedDisplays,
-                        selectedDisplayID: selectedDisplayID,
-                        appCountForDisplay: appCount(for:),
-                        preferredHeight: 150,
+            VStack(alignment: .leading, spacing: 14) {
+                ConnectedDisplaysOverview(
+                    displays: connectedDisplays,
+                    selectedDisplayID: selectedDisplayID,
+                    appCountForDisplay: appCount(for:),
+                    preferredHeight: 150,
+                    isExpanded: false,
+                    onToggleExpand: nil,
+                    onSelect: { display in
+                        selectedDisplayID = displaySectionIdentifier(for: display)
+                    }
+                )
+
+                if let selectedDisplay {
+                    DisplayLayoutWorkspace(
+                        display: selectedDisplay,
+                        layouts: appLayouts(for: selectedDisplay),
+                        viewportHeightOverride: 600,
                         isExpanded: false,
                         onToggleExpand: nil,
-                        onSelect: { display in
-                            selectedDisplayID = displaySectionIdentifier(for: display)
+                        onUpdateFrame: updateLayoutFrame,
+                        onReorder: { draggedID, targetID in
+                            reorderLayouts(on: selectedDisplay, moving: draggedID, after: targetID)
+                        },
+                        onAddApp: { app in
+                            addApp(app, to: selectedDisplay)
+                        },
+                        onRemove: deleteLayout,
+                        onCaptureCurrentDisplay: {
+                            captureCurrentDisplay(on: selectedDisplay)
                         }
                     )
-
-                    if let selectedDisplay {
-                        DisplayLayoutWorkspace(
-                            display: selectedDisplay,
-                            layouts: appLayouts(for: selectedDisplay),
-                            viewportHeightOverride: max(geometry.size.height - 230, 360),
-                            isExpanded: false,
-                            onToggleExpand: nil,
-                            onUpdateFrame: updateLayoutFrame,
-                            onReorder: { draggedID, targetID in
-                                reorderLayouts(on: selectedDisplay, moving: draggedID, after: targetID)
-                            },
-                            onAddApp: { app in
-                                addApp(app, to: selectedDisplay)
-                            },
-                            onRemove: deleteLayout,
-                            onCaptureCurrentDisplay: {
-                                captureCurrentDisplay(on: selectedDisplay)
-                            }
-                        )
-                    }
-
-                    if let captureFeedback {
-                        Label(captureFeedback.message, systemImage: captureFeedback.systemImage)
-                            .font(.callout)
-                            .foregroundStyle(captureFeedback.color)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 8)
-                            .background(
-                                RoundedRectangle(cornerRadius: 10)
-                                    .fill(captureFeedback.color.opacity(0.12))
-                            )
-                    }
-
-                    if unavailableLayoutCount > 0 {
-                        UnavailableLayoutsNotice(
-                            appCount: unavailableLayoutCount,
-                            onRemove: removeUnavailableLayouts
-                        )
-                    }
-
-                    Spacer(minLength: 0)
                 }
-                .padding(.horizontal, 28)
-                .padding(.vertical, 18)
-                .frame(width: geometry.size.width, alignment: .leading)
+
+                if let captureFeedback {
+                    Label(captureFeedback.message, systemImage: captureFeedback.systemImage)
+                        .font(.callout)
+                        .foregroundStyle(captureFeedback.color)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(captureFeedback.color.opacity(0.12))
+                        )
+                }
+
+                if unavailableLayoutCount > 0 {
+                    UnavailableLayoutsNotice(
+                        appCount: unavailableLayoutCount,
+                        onRemove: removeUnavailableLayouts
+                    )
+                }
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 18)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -1051,38 +1061,37 @@ private struct ConnectedDisplaysOverview: View {
                 }
             }
 
-            GeometryReader { geometry in
-                ScrollView([.horizontal, .vertical]) {
-                    ZStack(alignment: .topLeading) {
-                        RoundedRectangle(cornerRadius: 16)
-                            .fill(Color(nsColor: .controlBackgroundColor))
+            ScrollView([.horizontal, .vertical], showsIndicators: true) {
+                ZStack(alignment: .topLeading) {
+                    RoundedRectangle(cornerRadius: 16)
+                        .fill(Color(nsColor: .controlBackgroundColor))
 
-                        ForEach(displays, id: \.self) { display in
-                            let frame = overviewMetrics.frame(for: display)
+                    ForEach(displays, id: \.self) { display in
+                        let frame = overviewMetrics.frame(for: display)
 
-                            Button {
-                                onSelect(display)
-                            } label: {
-                                DisplayOverviewCard(
-                                    display: display,
-                                    appCount: appCountForDisplay(display),
-                                    isSelected: selectedDisplayID == displaySectionIdentifier(for: display)
-                                )
-                            }
-                            .buttonStyle(.plain)
-                            .frame(width: frame.width, height: frame.height)
-                            .position(x: frame.midX, y: frame.midY)
+                        Button {
+                            onSelect(display)
+                        } label: {
+                            DisplayOverviewCard(
+                                display: display,
+                                appCount: appCountForDisplay(display),
+                                isSelected: selectedDisplayID == displaySectionIdentifier(for: display)
+                            )
                         }
+                        .buttonStyle(.plain)
+                        .frame(width: frame.width, height: frame.height)
+                        .position(x: frame.midX, y: frame.midY)
                     }
-                    .frame(
-                        width: max(geometry.size.width, overviewMetrics.contentSize.width),
-                        height: max(geometry.size.height, overviewMetrics.contentSize.height),
-                        alignment: .topLeading
-                    )
                 }
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(
+                    width: overviewMetrics.contentSize.width,
+                    height: overviewMetrics.contentSize.height,
+                    alignment: .topLeading
+                )
             }
+            .clipShape(RoundedRectangle(cornerRadius: 16))
             .frame(height: overviewHeight)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(14)
         .frame(maxWidth: .infinity)
@@ -1350,88 +1359,77 @@ private struct DisplayLayoutWorkspace: View {
     }
 
     private var canvas: some View {
-        GeometryReader { geometry in
-            let metrics = DisplayCanvasMetrics(display: display)
-            let viewportWidth = geometry.size.width
-            let viewportHeight = geometry.size.height
-            let contentWidth = max(viewportWidth, metrics.contentSize.width)
-            let contentHeight = max(viewportHeight, metrics.contentSize.height)
-            let horizontalInset = max((viewportWidth - metrics.contentSize.width) / 2, 0)
-            let verticalInset = max((viewportHeight - metrics.contentSize.height) / 2, 0)
+        CanvasAdaptiveContainer { availableWidth in
+            let metrics = DisplayCanvasMetrics(
+                display: display,
+                targetMaxDisplayWidth: max(availableWidth - 48, 360)
+            )
 
-            ScrollView([.horizontal, .vertical]) {
-                ZStack(alignment: .topLeading) {
-                    RoundedRectangle(cornerRadius: 22)
-                        .fill(Color.black.opacity(0.16))
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color.black.opacity(0.16))
 
-                    RoundedRectangle(cornerRadius: 18)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color(nsColor: .controlBackgroundColor),
-                                    Color(nsColor: .windowBackgroundColor),
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
+                RoundedRectangle(cornerRadius: 18)
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                Color(nsColor: .controlBackgroundColor),
+                                Color(nsColor: .windowBackgroundColor),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
                         )
-                        .frame(width: metrics.canvasSize.width, height: metrics.canvasSize.height)
-                        .overlay(alignment: .topLeading) {
-                            Text("\(Int(display.width))×\(Int(display.height))")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .padding(12)
-                        }
-                        .offset(
-                            x: horizontalInset + metrics.padding,
-                            y: verticalInset + metrics.padding
-                        )
+                    )
+                    .frame(width: metrics.canvasSize.width, height: metrics.canvasSize.height)
+                    .overlay(alignment: .topLeading) {
+                        Text("\(Int(display.width))×\(Int(display.height))")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(12)
+                    }
+                    .offset(x: metrics.padding, y: metrics.padding)
 
-                    if windows.isEmpty {
-                        ContentUnavailableView(
-                            "No Apps on This Display",
-                            systemImage: "macwindow",
-                            description: Text("Add apps from the sidebar or capture the current display to start arranging this screen.")
-                        )
-                        .frame(width: metrics.canvasSize.width, height: metrics.canvasSize.height)
-                        .offset(
-                            x: horizontalInset + metrics.padding,
-                            y: verticalInset + metrics.padding
-                        )
-                    } else {
-                        ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
-                            let frame = metrics.frame(for: window.frame)
+                if windows.isEmpty {
+                    ContentUnavailableView(
+                        "No Apps on This Display",
+                        systemImage: "macwindow",
+                        description: Text("Add apps from the sidebar or capture the current display to start arranging this screen.")
+                    )
+                    .frame(width: metrics.canvasSize.width, height: metrics.canvasSize.height)
+                    .offset(x: metrics.padding, y: metrics.padding)
+                } else {
+                    ForEach(Array(windows.enumerated()), id: \.element.id) { index, window in
+                        let frame = metrics.frame(for: window.frame)
 
-                            DisplayCanvasWindow(
-                                window: window,
-                                isActive: activeWindowID == window.id,
-                                onSelect: { activeWindowID = window.id },
-                                onMoveChanged: { value in
-                                    moveWindow(window.id, by: value.translation, scale: metrics.scale)
-                                },
-                                onMoveEnded: endInteraction,
-                                onResizeChanged: { value in
-                                    resizeWindow(window.id, by: value.translation, scale: metrics.scale)
-                                },
-                                onResizeEnded: endInteraction
-                            )
-                            .frame(width: frame.width, height: frame.height)
-                            .offset(
-                                x: horizontalInset + frame.minX,
-                                y: verticalInset + frame.minY
-                            )
-                            .zIndex(activeWindowID == window.id ? 1000 : Double(index))
-                        }
+                        DisplayCanvasWindow(
+                            window: window,
+                            isActive: activeWindowID == window.id,
+                            onSelect: { activeWindowID = window.id },
+                            onMoveChanged: { value in
+                                moveWindow(window.id, by: value.translation, scale: metrics.scale)
+                            },
+                            onMoveEnded: endInteraction,
+                            onResizeChanged: { value in
+                                resizeWindow(window.id, by: value.translation, scale: metrics.scale)
+                            },
+                            onResizeEnded: endInteraction
+                        )
+                        .frame(width: frame.width, height: frame.height)
+                        .offset(x: frame.minX, y: frame.minY)
+                        .zIndex(activeWindowID == window.id ? 1000 : Double(index))
                     }
                 }
-                .frame(width: contentWidth, height: contentHeight, alignment: .topLeading)
             }
+            .frame(
+                width: metrics.contentSize.width,
+                height: metrics.contentSize.height,
+                alignment: .topLeading
+            )
             .clipShape(RoundedRectangle(cornerRadius: 22))
-        }
-        .frame(maxWidth: .infinity, minHeight: canvasViewportHeight, maxHeight: canvasViewportHeight)
-        .background {
-            RoundedRectangle(cornerRadius: 22)
-                .fill(Color(nsColor: .windowBackgroundColor))
+            .background {
+                RoundedRectangle(cornerRadius: 22)
+                    .fill(Color(nsColor: .windowBackgroundColor))
+            }
         }
     }
 
@@ -1487,31 +1485,28 @@ private struct DisplayLayoutWorkspace: View {
                     .font(.callout)
                     .foregroundStyle(.secondary)
             } else {
-                ScrollView {
-                    VStack(spacing: 8) {
-                        ForEach(windows) { window in
-                            CanvasWindowSidebarRow(
-                                window: window,
-                                isActive: activeWindowID == window.id,
-                                isDragging: draggedLayoutID == window.id,
-                                isDropTargeted: targetedSidebarLayoutID == window.id,
-                                onSelect: { activeWindowID = window.id },
-                                onDelete: { onRemove(window.id) },
-                                onDragStarted: { beginDraggingSidebar(window.id) }
+                VStack(spacing: 8) {
+                    ForEach(windows) { window in
+                        CanvasWindowSidebarRow(
+                            window: window,
+                            isActive: activeWindowID == window.id,
+                            isDragging: draggedLayoutID == window.id,
+                            isDropTargeted: targetedSidebarLayoutID == window.id,
+                            onSelect: { activeWindowID = window.id },
+                            onDelete: { onRemove(window.id) },
+                            onDragStarted: { beginDraggingSidebar(window.id) }
+                        )
+                        .contentShape(Rectangle())
+                        .onDrop(
+                            of: [UTType.plainText],
+                            delegate: DisplaySidebarDropDelegate(
+                                targetAfterID: window.id,
+                                onTargetingChanged: handleSidebarDropTargetChange,
+                                onDrop: performSidebarDrop
                             )
-                            .contentShape(Rectangle())
-                            .onDrop(
-                                of: [UTType.plainText],
-                                delegate: DisplaySidebarDropDelegate(
-                                    targetAfterID: window.id,
-                                    onTargetingChanged: handleSidebarDropTargetChange,
-                                    onDrop: performSidebarDrop
-                                )
-                            )
-                        }
+                        )
                     }
                 }
-                .frame(maxHeight: 280)
             }
 
             Text("The app list controls stacking for this display. Later items are raised later, so they end up above earlier ones.")
@@ -1525,10 +1520,6 @@ private struct DisplayLayoutWorkspace: View {
             RoundedRectangle(cornerRadius: 20)
                 .fill(Color(nsColor: .windowBackgroundColor))
         }
-    }
-
-    private var canvasViewportHeight: CGFloat {
-        viewportHeightOverride ?? min(max(DisplayCanvasMetrics(display: display).contentSize.height, 320), 500)
     }
 
     private var sidebarWidth: CGFloat {
@@ -1771,6 +1762,52 @@ private struct DisplayCanvasMetrics {
             width: CGFloat(windowFrame.width) * scale,
             height: CGFloat(windowFrame.height) * scale
         )
+    }
+}
+
+/// Hosts the display canvas without a `ScrollView`. Reads the available width
+/// so the canvas can pick a scale that fits, then reports its intrinsic
+/// height back up the view tree so the row's height matches the content.
+///
+/// We need the height round-trip because a bare `GeometryReader` would
+/// unconditionally fill its parent's vertical space — undesirable when the
+/// container lives inside an outer scroll view that should flow naturally.
+private struct CanvasAdaptiveContainer<Content: View>: View {
+    let content: (CGFloat) -> Content
+
+    @State private var measuredHeight: CGFloat = 320
+
+    init(@ViewBuilder content: @escaping (CGFloat) -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            content(geometry.size.width)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    GeometryReader { proxy in
+                        Color.clear.preference(
+                            key: CanvasHeightPreferenceKey.self,
+                            value: proxy.size.height
+                        )
+                    }
+                )
+                .onPreferenceChange(CanvasHeightPreferenceKey.self) { newValue in
+                    let clamped = max(newValue, 200)
+                    if abs(clamped - measuredHeight) > 0.5 {
+                        measuredHeight = clamped
+                    }
+                }
+        }
+        .frame(height: measuredHeight)
+    }
+}
+
+private struct CanvasHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 
