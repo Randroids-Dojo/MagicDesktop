@@ -93,9 +93,25 @@ enum WindowManager {
         targetWindow(for: app.processIdentifier) != nil
     }
 
-    static func captureCurrentFrame(for app: NSRunningApplication) -> WindowFrame? {
-        guard let window = targetWindow(for: app.processIdentifier) else { return nil }
+    static func captureCurrentFrame(
+        for app: NSRunningApplication,
+        matchingWindowID windowMatcher: ((CGWindowID) -> Bool)? = nil
+    ) -> WindowFrame? {
+        guard let window = targetWindow(for: app, matchingWindowID: windowMatcher) else { return nil }
         return currentFrame(for: window)
+    }
+
+    static func targetWindowID(for app: NSRunningApplication) -> CGWindowID? {
+        guard let bundleIdentifier = app.bundleIdentifier,
+              let window = targetWindow(for: app.processIdentifier) else {
+            return nil
+        }
+
+        return cgWindowID(
+            for: window,
+            pid: app.processIdentifier,
+            bundleIdentifier: bundleIdentifier
+        )
     }
 
     private static func currentFrame(for window: AXUIElement) -> WindowFrame? {
@@ -162,9 +178,10 @@ enum WindowManager {
 
     /// Captures a window's frame as coordinates relative to its display, plus display info.
     static func captureDisplayRelativeLayout(
-        for app: NSRunningApplication
+        for app: NSRunningApplication,
+        matchingWindowID windowMatcher: ((CGWindowID) -> Bool)? = nil
     ) -> (relativeFrame: WindowFrame, display: DisplayInfo, absoluteFrame: WindowFrame)? {
-        guard let absoluteFrame = captureCurrentFrame(for: app) else { return nil }
+        guard let absoluteFrame = captureCurrentFrame(for: app, matchingWindowID: windowMatcher) else { return nil }
         let windowRect = cgRect(for: absoluteFrame)
 
         guard let screen = screen(bestMatchingAXFrame: windowRect) else { return nil }
@@ -425,37 +442,80 @@ enum WindowManager {
         AXUIElementCreateApplication(pid)
     }
 
+    private static func targetWindow(
+        for app: NSRunningApplication,
+        matchingWindowID windowMatcher: ((CGWindowID) -> Bool)? = nil
+    ) -> AXUIElement? {
+        let candidates = targetWindowCandidates(for: app.processIdentifier)
+        guard let windowMatcher,
+              let bundleIdentifier = app.bundleIdentifier else {
+            return candidates.first
+        }
+
+        return candidates.first { window in
+            guard let windowID = cgWindowID(
+                for: window,
+                pid: app.processIdentifier,
+                bundleIdentifier: bundleIdentifier
+            ) else {
+                return false
+            }
+
+            return windowMatcher(windowID)
+        }
+    }
+
     private static func targetWindow(for pid: pid_t) -> AXUIElement? {
+        targetWindowCandidates(for: pid).first
+    }
+
+    private static func targetWindowCandidates(for pid: pid_t) -> [AXUIElement] {
         let appRef = applicationElement(for: pid)
         let windows = windows(for: appRef)
+        var candidates: [AXUIElement] = []
+        var seenWindows = Set<CFHashCode>()
 
         if let focusedWindow = window(for: appRef, attribute: kAXFocusedWindowAttribute as CFString),
            hasPositiveFrame(focusedWindow) {
-            return focusedWindow
+            appendWindow(focusedWindow, to: &candidates, seenWindows: &seenWindows)
         }
 
         if let mainWindow = window(for: appRef, attribute: kAXMainWindowAttribute as CFString),
            hasPositiveFrame(mainWindow) {
-            return mainWindow
+            appendWindow(mainWindow, to: &candidates, seenWindows: &seenWindows)
         }
 
-        if let standardWindow = windows.first(where: isStandardWindow) {
-            return standardWindow
+        windows.filter(isStandardWindow).forEach {
+            appendWindow($0, to: &candidates, seenWindows: &seenWindows)
         }
 
-        if let windowRoleWindow = windows.first(where: isWindowRoleWindow) {
-            return windowRoleWindow
+        windows.filter(isWindowRoleWindow).forEach {
+            appendWindow($0, to: &candidates, seenWindows: &seenWindows)
         }
 
-        if let titledWindow = windows.first(where: isTitledWindow) {
-            return titledWindow
+        windows.filter(isTitledWindow).forEach {
+            appendWindow($0, to: &candidates, seenWindows: &seenWindows)
         }
 
         if isFinder(pid: pid) {
-            return nil
+            return candidates
         }
 
-        return windows.first(where: hasPositiveFrame)
+        windows.filter(hasPositiveFrame).forEach {
+            appendWindow($0, to: &candidates, seenWindows: &seenWindows)
+        }
+
+        return candidates
+    }
+
+    private static func appendWindow(
+        _ window: AXUIElement,
+        to candidates: inout [AXUIElement],
+        seenWindows: inout Set<CFHashCode>
+    ) {
+        let hash = CFHash(window)
+        guard seenWindows.insert(hash).inserted else { return }
+        candidates.append(window)
     }
 
     private static func window(for appRef: AXUIElement, attribute: CFString) -> AXUIElement? {
@@ -533,6 +593,92 @@ enum WindowManager {
         let subrole = stringAttribute(kAXSubroleAttribute as CFString, from: window) ?? "<no-subrole>"
         let frame = currentFrame(for: window).map(describe) ?? "unavailable"
         return "title='\(title)' role=\(role) subrole=\(subrole) frame=\(frame)"
+    }
+
+    private static func cgWindowID(
+        for window: AXUIElement,
+        pid: pid_t,
+        bundleIdentifier: String
+    ) -> CGWindowID? {
+        let axTitle = stringAttribute(kAXTitleAttribute as CFString, from: window)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let axFrame = currentFrame(for: window)
+        let ownerName = NSRunningApplication(processIdentifier: pid)?.localizedName ?? bundleIdentifier
+
+        let candidates = (CGWindowListCopyWindowInfo([.optionAll], kCGNullWindowID) as? [[String: Any]] ?? [])
+            .compactMap { info -> WindowCandidate? in
+                guard let ownerPID = info[kCGWindowOwnerPID as String] as? NSNumber,
+                      ownerPID.intValue == pid,
+                      let windowNumber = info[kCGWindowNumber as String] as? NSNumber else {
+                    return nil
+                }
+
+                let title = (info[kCGWindowName as String] as? String)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                let boundsDictionary = info[kCGWindowBounds as String] as? NSDictionary
+                let bounds = boundsDictionary.flatMap { boundsDictionary in
+                    CGRect(dictionaryRepresentation: boundsDictionary)
+                }
+                let layer = (info[kCGWindowLayer as String] as? NSNumber)?.intValue ?? 0
+
+                return WindowCandidate(
+                    id: CGWindowID(windowNumber.uint32Value),
+                    ownerName: info[kCGWindowOwnerName as String] as? String ?? "",
+                    title: title,
+                    bounds: bounds,
+                    layer: layer
+                )
+            }
+
+        let bestMatch = candidates.max { lhs, rhs in
+            candidateScore(lhs, title: axTitle, frame: axFrame, ownerName: ownerName)
+                < candidateScore(rhs, title: axTitle, frame: axFrame, ownerName: ownerName)
+        }
+
+        return bestMatch?.id
+    }
+
+    private static func candidateScore(
+        _ candidate: WindowCandidate,
+        title: String?,
+        frame: WindowFrame?,
+        ownerName: String
+    ) -> Int {
+        var score = 0
+
+        if candidate.layer == 0 {
+            score += 10
+        }
+
+        if candidate.ownerName == ownerName {
+            score += 20
+        }
+
+        if let title,
+           let candidateTitle = candidate.title,
+           !title.isEmpty,
+           title == candidateTitle {
+            score += 50
+        }
+
+        if let frame,
+           let bounds = candidate.bounds,
+           roughlyEqual(bounds.origin.x, frame.x, tolerance: 12),
+           roughlyEqual(bounds.origin.y, frame.y, tolerance: 12),
+           roughlyEqual(bounds.size.width, frame.width, tolerance: 12),
+           roughlyEqual(bounds.size.height, frame.height, tolerance: 12) {
+            score += 100
+        }
+
+        return score
+    }
+
+    private struct WindowCandidate {
+        let id: CGWindowID
+        let ownerName: String
+        let title: String?
+        let bounds: CGRect?
+        let layer: Int
     }
 
     private static func stringAttribute(_ attribute: CFString, from element: AXUIElement) -> String? {

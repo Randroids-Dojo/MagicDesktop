@@ -2,225 +2,481 @@ import KeyboardShortcuts
 import SwiftUI
 import UniformTypeIdentifiers
 
+/// Editor for a single `SpaceConfiguration`.
+///
+/// The layout is a three-row stack:
+///   1. Header bar — inline-editable name, shortcut chip, Capture, and Run
+///   2. Desktop bar — segmented desktop chips with per-chip context menu, inline rename
+///   3. Workspace — a horizontal display minimap sitting above the drag-to-position canvas
+///
+/// No more card-in-card — chrome is limited to two dividers and a single content padding.
+@MainActor
 struct ConfigurationEditorView: View {
-    private enum DisplaySetupFocus {
-        case overview
-        case workspace
-    }
-
     @Binding var config: SpaceConfiguration
     let slotIndex: Int
-    @State private var draggedLayoutID: AppLayout.ID?
-    @State private var targetedInsertionIndex: Int?
-    @State private var dragResetTask: Task<Void, Never>?
+    let onActivate: (SpaceConfiguration) -> Void
+
+    private let desktopManager = DesktopManager()
     @State private var captureFeedback: CaptureFeedback?
+    @State private var selectedDesktopID: DesktopLayout.ID?
     @State private var selectedDisplayID: String?
-    @State private var displaySetupFocus: DisplaySetupFocus?
 
     var body: some View {
-        GeometryReader { geometry in
-            if let displaySetupFocus {
-                expandedDisplaySetupView(
-                    in: geometry.size,
-                    focus: displaySetupFocus
-                )
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 20) {
-                        generalSection
-                        displaySetupSection
-                    }
-                    .frame(
-                        width: max(geometry.size.width - 32, 0),
-                        alignment: .leading
-                    )
-                    .padding(16)
-                    .padding(.top, 8)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            }
+        VStack(spacing: 0) {
+            headerBar
+                .padding(.horizontal, 28)
+                .padding(.top, 24)
+                .padding(.bottom, 18)
+
+            Divider()
+
+            desktopBar
+                .padding(.horizontal, 28)
+                .padding(.vertical, 14)
+
+            Divider()
+
+            workspace
         }
         .background(Color(nsColor: .windowBackgroundColor))
-        .onAppear(perform: ensureValidSelectedDisplay)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .onAppear {
+            ensureValidSelectedDesktop()
+            ensureValidSelectedDisplay()
+        }
+        .onChange(of: config.desktops.map(\.id)) { _, _ in
+            ensureValidSelectedDesktop()
+            ensureValidSelectedDisplay()
+        }
+        .onChange(of: selectedDesktopID) { _, _ in
+            ensureValidSelectedDisplay()
+        }
         .onChange(of: connectedDisplayIdentifiers) { _, _ in
             ensureValidSelectedDisplay()
         }
     }
 
-    private var generalSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("General")
-                .font(.headline)
+    // MARK: - Header
 
-            VStack(alignment: .leading, spacing: 12) {
-                EditorFieldRow(label: "Name") {
-                    TextField("Configuration Name", text: $config.name)
-                        .textFieldStyle(.roundedBorder)
+    private var headerBar: some View {
+        HStack(alignment: .center, spacing: 16) {
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Configuration Name", text: $config.name)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 24, weight: .semibold))
+                    .lineLimit(1)
+
+                Text(summaryLine)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+            }
+            .layoutPriority(1)
+
+            Spacer(minLength: 16)
+
+            if slotIndex < 9 {
+                shortcutChip
+            }
+
+            Button {
+                captureCurrentLayout()
+            } label: {
+                Label("Capture Windows", systemImage: "camera.viewfinder")
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .help("Capture the visible app windows on the active macOS desktop into the selected desktop")
+
+            Button {
+                onActivate(config)
+            } label: {
+                Label("Run", systemImage: "play.fill")
+            }
+            .buttonStyle(.borderedProminent)
+            .controlSize(.large)
+            .help("Activate this configuration now")
+        }
+    }
+
+    private var shortcutChip: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "command")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(.secondary)
+            KeyboardShortcuts.Recorder("Shortcut", name: .spaceSlot(slotIndex))
+                .labelsHidden()
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 4)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
+    }
+
+    private var summaryLine: String {
+        let d = config.desktops.count
+        let a = config.totalAppCount
+        let desktopText = d == 1 ? "1 desktop" : "\(d) desktops"
+        let appText = a == 1 ? "1 app" : "\(a) apps"
+        return "\(desktopText) · \(appText)"
+    }
+
+    // MARK: - Desktop bar
+
+    private var desktopBar: some View {
+        HStack(alignment: .center, spacing: 12) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    ForEach(Array(config.desktops.enumerated()), id: \.element.id) { index, desktop in
+                        desktopChip(desktop: desktop, index: index)
+                    }
+
+                    Button(action: addDesktop) {
+                        Label("Add Desktop", systemImage: "plus")
+                            .labelStyle(.iconOnly)
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.bordered)
+                    .help("Add another desktop to this configuration")
                 }
+                .padding(.vertical, 2)
+            }
 
-                if slotIndex < 9 {
-                    KeyboardShortcuts.Recorder(
-                        "Shortcut",
-                        name: .spaceSlot(slotIndex)
+            Spacer(minLength: 0)
+
+            if let index = selectedDesktopIndex {
+                renameField(for: index)
+            }
+        }
+    }
+
+    private func desktopChip(desktop: DesktopLayout, index: Int) -> some View {
+        let selected = desktop.id == resolvedSelectedDesktopID
+        return Button {
+            selectedDesktopID = desktop.id
+        } label: {
+            HStack(spacing: 6) {
+                Text(desktop.name.isEmpty ? DesktopLayout.defaultName(for: index) : desktop.name)
+                    .font(.system(size: 13, weight: selected ? .semibold : .regular))
+                if desktop.appLayouts.count > 0 {
+                    Text("\(desktop.appLayouts.count)")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(selected ? Color.white.opacity(0.9) : Color.secondary)
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 1)
+                        .background(
+                            Capsule()
+                                .fill(selected
+                                      ? Color.white.opacity(0.22)
+                                      : Color(nsColor: .quaternaryLabelColor).opacity(0.75))
+                        )
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .foregroundStyle(selected ? Color.white : Color.primary)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(selected ? Color.accentColor : Color(nsColor: .controlBackgroundColor))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(
+                        selected ? Color.clear : Color(nsColor: .separatorColor),
+                        lineWidth: 0.5
                     )
-                }
-            }
+            )
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(sectionBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .buttonStyle(.plain)
+        .contextMenu {
+            Button("Duplicate (Empty)") { duplicateDesktop(at: index) }
+            Divider()
+            Button("Move Left") { moveDesktop(from: index, by: -1) }
+                .disabled(index == 0)
+            Button("Move Right") { moveDesktop(from: index, by: 1) }
+                .disabled(index >= config.desktops.count - 1)
+            Divider()
+            Button("Delete", role: .destructive) { deleteDesktop(at: index) }
+                .disabled(config.desktops.count <= 1)
+        }
     }
 
-    private var displaySetupSection: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Display Setup")
-                        .font(.headline)
-
-                    Text("Select a connected monitor to arrange it visually. Drag windows on the canvas and reorder the app list on the right to control front-to-back stacking for that screen.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                Button("Capture All Displays") {
-                    captureCurrentLayout()
-                }
-                .buttonStyle(.bordered)
-                .help("Captures the position and size of all currently visible app windows and records which display each one belongs to")
-            }
-
-            displaySetupContent()
+    private func renameField(for index: Int) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: "pencil")
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+            TextField(
+                DesktopLayout.defaultName(for: index),
+                text: Binding(
+                    get: {
+                        guard config.desktops.indices.contains(index) else { return "" }
+                        return config.desktops[index].name
+                    },
+                    set: { newValue in
+                        guard config.desktops.indices.contains(index) else { return }
+                        config.desktops[index].name = newValue
+                    }
+                )
+            )
+            .textFieldStyle(.plain)
+            .frame(minWidth: 120, idealWidth: 160, maxWidth: 220)
         }
-        .padding(20)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(sectionBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 22))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(Color(nsColor: .controlBackgroundColor))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 8)
+                .strokeBorder(Color(nsColor: .separatorColor), lineWidth: 0.5)
+        )
     }
+
+    private var resolvedSelectedDesktopID: DesktopLayout.ID? {
+        if let selectedDesktopID,
+           config.desktops.contains(where: { $0.id == selectedDesktopID }) {
+            return selectedDesktopID
+        }
+        return config.desktops.first?.id
+    }
+
+    // MARK: - Workspace
 
     @ViewBuilder
-    private func displaySetupContent(
-        overviewHeight: CGFloat? = nil,
-        workspaceViewportHeight: CGFloat? = nil,
-        focus: DisplaySetupFocus? = nil
-    ) -> some View {
+    private var workspace: some View {
         if connectedDisplays.isEmpty {
             ContentUnavailableView(
                 "No Connected Displays",
                 systemImage: "display.trianglebadge.exclamationmark",
-                description: Text("Connect a display to use the visual layout editor.")
+                description: Text("Connect a display to edit window layouts.")
             )
-        } else {
-            if focus != .workspace {
-                ConnectedDisplaysOverview(
-                    displays: connectedDisplays,
-                    selectedDisplayID: selectedDisplayID,
-                    appCountForDisplay: appCount(for:),
-                    preferredHeight: overviewHeight,
-                    isExpanded: focus == .overview,
-                    onToggleExpand: { toggleDisplaySetupFocus(.overview) },
-                    onSelect: { display in
-                        selectedDisplayID = displaySectionIdentifier(for: display)
-                    }
-                )
-            }
-
-            if focus != .overview,
-               let selectedDisplay {
-                DisplayLayoutWorkspace(
-                    display: selectedDisplay,
-                    layouts: appLayouts(for: selectedDisplay),
-                    viewportHeightOverride: workspaceViewportHeight,
-                    isExpanded: focus == .workspace,
-                    onToggleExpand: { toggleDisplaySetupFocus(.workspace) },
-                    onUpdateFrame: updateLayoutFrame,
-                    onReorder: { draggedID, targetID in
-                        reorderLayouts(on: selectedDisplay, moving: draggedID, after: targetID)
-                    },
-                    onAddApp: { app in
-                        addApp(app, to: selectedDisplay)
-                    },
-                    onRemove: deleteLayout,
-                    onCaptureCurrentDisplay: {
-                        captureCurrentDisplay(on: selectedDisplay)
-                    }
-                )
-            }
-
-            if let captureFeedback {
-                Label(captureFeedback.message, systemImage: captureFeedback.systemImage)
-                    .font(.callout)
-                    .foregroundStyle(captureFeedback.color)
-            }
-
-            if unavailableLayoutCount > 0 {
-                UnavailableLayoutsNotice(
-                    appCount: unavailableLayoutCount,
-                    onRemove: removeUnavailableLayouts
-                )
-            }
-        }
-    }
-
-    private func expandedDisplaySetupView(
-        in size: CGSize,
-        focus: DisplaySetupFocus
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            HStack(alignment: .top, spacing: 16) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Text("Display Setup")
-                        .font(.title2)
-                        .fontWeight(.semibold)
-
-                    Text(focus == .overview
-                         ? "Inspect the full monitor arrangement and pick which screen to edit."
-                         : "Edit the selected display in a larger workspace.")
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer(minLength: 0)
-
-                Button("Return to Configuration") {
-                    displaySetupFocus = nil
-                }
-                .buttonStyle(.bordered)
-
-                Button("Capture All Displays") {
-                    captureCurrentLayout()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            displaySetupContent(
-                overviewHeight: max(size.height - 180, 380),
-                workspaceViewportHeight: max(size.height - 210, 460),
-                focus: focus
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else if selectedDesktop == nil {
+            ContentUnavailableView(
+                "No Desktop Selected",
+                systemImage: "rectangle.stack",
+                description: Text("Create or select a desktop above to edit its layout.")
             )
-        }
-        .padding(16)
-        .frame(
-            width: max(size.width - 32, 0),
-            height: max(size.height - 32, 0),
-            alignment: .topLeading
-        )
-        .padding(.top, 8)
-    }
-
-    private func toggleDisplaySetupFocus(_ focus: DisplaySetupFocus) {
-        if displaySetupFocus == focus {
-            displaySetupFocus = nil
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
         } else {
-            displaySetupFocus = focus
+            GeometryReader { geometry in
+                VStack(alignment: .leading, spacing: 14) {
+                    ConnectedDisplaysOverview(
+                        displays: connectedDisplays,
+                        selectedDisplayID: selectedDisplayID,
+                        appCountForDisplay: appCount(for:),
+                        preferredHeight: 150,
+                        isExpanded: false,
+                        onToggleExpand: nil,
+                        onSelect: { display in
+                            selectedDisplayID = displaySectionIdentifier(for: display)
+                        }
+                    )
+
+                    if let selectedDisplay {
+                        DisplayLayoutWorkspace(
+                            display: selectedDisplay,
+                            layouts: appLayouts(for: selectedDisplay),
+                            viewportHeightOverride: max(geometry.size.height - 230, 360),
+                            isExpanded: false,
+                            onToggleExpand: nil,
+                            onUpdateFrame: updateLayoutFrame,
+                            onReorder: { draggedID, targetID in
+                                reorderLayouts(on: selectedDisplay, moving: draggedID, after: targetID)
+                            },
+                            onAddApp: { app in
+                                addApp(app, to: selectedDisplay)
+                            },
+                            onRemove: deleteLayout,
+                            onCaptureCurrentDisplay: {
+                                captureCurrentDisplay(on: selectedDisplay)
+                            }
+                        )
+                    }
+
+                    if let captureFeedback {
+                        Label(captureFeedback.message, systemImage: captureFeedback.systemImage)
+                            .font(.callout)
+                            .foregroundStyle(captureFeedback.color)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 10)
+                                    .fill(captureFeedback.color.opacity(0.12))
+                            )
+                    }
+
+                    if unavailableLayoutCount > 0 {
+                        UnavailableLayoutsNotice(
+                            appCount: unavailableLayoutCount,
+                            onRemove: removeUnavailableLayouts
+                        )
+                    }
+
+                    Spacer(minLength: 0)
+                }
+                .padding(.horizontal, 28)
+                .padding(.vertical, 18)
+                .frame(width: geometry.size.width, alignment: .leading)
+            }
         }
     }
 
-    private var sectionBackground: some View {
-        RoundedRectangle(cornerRadius: 22)
-            .fill(Color(nsColor: .controlBackgroundColor))
+    // MARK: - Desktop actions (index-based)
+
+    private func duplicateDesktop(at index: Int) {
+        guard config.desktops.indices.contains(index) else { return }
+        let source = config.desktops[index]
+        let duplicate = DesktopLayout(name: "\(source.name) Copy")
+        let insertIndex = min(index + 1, config.desktops.count)
+        config.desktops.insert(duplicate, at: insertIndex)
+        selectedDesktopID = duplicate.id
+        captureFeedback = source.appLayouts.isEmpty
+            ? nil
+            : CaptureFeedback(
+                message: "Created \(duplicate.name) without apps. MagicDesktop currently restores one window per app bundle, so each app can belong to only one saved desktop.",
+                kind: .warning
+            )
+    }
+
+    private func moveDesktop(from index: Int, by offset: Int) {
+        guard config.desktops.indices.contains(index) else { return }
+        let destination = index + offset
+        guard config.desktops.indices.contains(destination) else { return }
+        let desktop = config.desktops.remove(at: index)
+        config.desktops.insert(desktop, at: destination)
+        selectedDesktopID = desktop.id
+        captureFeedback = nil
+    }
+
+    private func deleteDesktop(at index: Int) {
+        guard config.desktops.count > 1,
+              config.desktops.indices.contains(index) else { return }
+        let removedID = config.desktops[index].id
+        config.desktops.remove(at: index)
+        if selectedDesktopID == removedID {
+            let fallbackIndex = min(index, config.desktops.count - 1)
+            selectedDesktopID = config.desktops[fallbackIndex].id
+        }
+        captureFeedback = nil
+    }
+
+    private var selectedDesktopIndex: Int? {
+        guard !config.desktops.isEmpty else { return nil }
+
+        if let selectedDesktopID,
+           let index = config.desktops.firstIndex(where: { $0.id == selectedDesktopID }) {
+            return index
+        }
+
+        return config.desktops.startIndex
+    }
+
+    private var selectedDesktop: DesktopLayout? {
+        guard let selectedDesktopIndex,
+              config.desktops.indices.contains(selectedDesktopIndex) else { return nil }
+        return config.desktops[selectedDesktopIndex]
+    }
+
+    private var selectedDesktopName: String {
+        selectedDesktop?.name ?? DesktopLayout.defaultName(for: 0)
+    }
+
+    private var selectedDesktopLayouts: [AppLayout] {
+        selectedDesktop?.appLayouts ?? []
+    }
+
+    private func ensureValidSelectedDesktop() {
+        if config.desktops.isEmpty {
+            config.desktops = [DesktopLayout()]
+        }
+
+        if let selectedDesktopID,
+           config.desktops.contains(where: { $0.id == selectedDesktopID }) {
+            return
+        }
+
+        selectedDesktopID = config.desktops.first?.id
+    }
+
+    private func updateSelectedDesktop(_ update: (inout DesktopLayout) -> Void) {
+        guard let selectedDesktopIndex,
+              config.desktops.indices.contains(selectedDesktopIndex) else { return }
+        update(&config.desktops[selectedDesktopIndex])
+    }
+
+    private func replaceSelectedDesktopLayouts(_ layouts: [AppLayout]) {
+        updateSelectedDesktop { desktop in
+            desktop.appLayouts = layouts
+        }
+    }
+
+    private func nextDesktopName() -> String {
+        let existingNames = Set(config.desktops.map(\.name))
+        var number = 1
+
+        while existingNames.contains(DesktopLayout.defaultName(for: number - 1)) {
+            number += 1
+        }
+
+        return DesktopLayout.defaultName(for: number - 1)
+    }
+
+    private func addDesktop() {
+        let insertIndex = min((selectedDesktopIndex ?? (config.desktops.count - 1)) + 1, config.desktops.count)
+        let desktop = DesktopLayout(name: nextDesktopName())
+        config.desktops.insert(desktop, at: insertIndex)
+        selectedDesktopID = desktop.id
+        captureFeedback = nil
+    }
+
+    private func duplicateSelectedDesktop() {
+        guard let selectedDesktopIndex,
+              config.desktops.indices.contains(selectedDesktopIndex) else { return }
+
+        let source = config.desktops[selectedDesktopIndex]
+        let duplicate = DesktopLayout(name: "\(source.name) Copy")
+
+        let insertIndex = min(selectedDesktopIndex + 1, config.desktops.count)
+        config.desktops.insert(duplicate, at: insertIndex)
+        selectedDesktopID = duplicate.id
+        captureFeedback = source.appLayouts.isEmpty
+            ? nil
+            : CaptureFeedback(
+                message: "Created \(duplicate.name) without apps. MagicDesktop currently restores one window per app bundle, so each app can belong to only one saved desktop.",
+                kind: .warning
+            )
+    }
+
+    private func deleteSelectedDesktop() {
+        guard config.desktops.count > 1,
+              let selectedDesktopIndex,
+              config.desktops.indices.contains(selectedDesktopIndex) else { return }
+
+        config.desktops.remove(at: selectedDesktopIndex)
+        let fallbackIndex = min(selectedDesktopIndex, config.desktops.count - 1)
+        selectedDesktopID = config.desktops[fallbackIndex].id
+        captureFeedback = nil
+    }
+
+    private func moveSelectedDesktop(by offset: Int) {
+        guard let selectedDesktopIndex,
+              config.desktops.indices.contains(selectedDesktopIndex) else { return }
+
+        let destination = selectedDesktopIndex + offset
+        guard config.desktops.indices.contains(destination) else { return }
+
+        let desktop = config.desktops.remove(at: selectedDesktopIndex)
+        config.desktops.insert(desktop, at: destination)
+        selectedDesktopID = desktop.id
+        captureFeedback = nil
     }
 
     private func captureCurrentLayout() {
@@ -232,30 +488,23 @@ struct ConfigurationEditorView: View {
             return
         }
 
+        guard let activeDesktopID = activeDesktopIDForCapture() else { return }
+
         let workspace = NSWorkspace.shared
         var capturedLayouts: [CapturedLayout] = []
 
         for app in runningApplicationsForCapture(in: workspace) {
-            guard let bundleID = app.bundleIdentifier else { continue }
-            guard let result = WindowManager.captureDisplayRelativeLayout(for: app) else { continue }
-            guard result.relativeFrame.width > 0 && result.relativeFrame.height > 0 else { continue }
+            guard let capturedLayout = captureCandidateLayout(
+                for: app,
+                activeDesktopID: activeDesktopID
+            ) else { continue }
 
-            capturedLayouts.append(
-                CapturedLayout(
-                    absoluteFrame: result.absoluteFrame,
-                    layout: AppLayout(
-                        bundleIdentifier: bundleID,
-                        appName: app.localizedName ?? bundleID,
-                        frame: result.relativeFrame,
-                        display: result.display
-                    )
-                )
-            )
+            capturedLayouts.append(capturedLayout)
         }
 
         guard !capturedLayouts.isEmpty else {
             captureFeedback = CaptureFeedback(
-                message: "No standard app windows were available to capture.",
+                message: "No standard app windows were available to capture on \(selectedDesktopName).",
                 kind: .warning
             )
             return
@@ -284,16 +533,59 @@ struct ConfigurationEditorView: View {
             }
 
             return lhs.layout.appName.localizedStandardCompare(rhs.layout.appName) == .orderedAscending
-        }
+        }.map(\.layout)
 
-        config.appLayouts = sortedLayouts.map(\.layout)
+        replaceSelectedDesktopLayouts(sortedLayouts)
 
-        let displayCount = Set(sortedLayouts.compactMap(\.layout.display)).count
+        let displayCount = Set(sortedLayouts.compactMap(\.display)).count
         let displaySummary = displayCount == 1 ? "1 display" : "\(displayCount) displays"
         let appSummary = sortedLayouts.count == 1 ? "1 app" : "\(sortedLayouts.count) apps"
         captureFeedback = CaptureFeedback(
-            message: "Captured \(appSummary) across \(displaySummary). Reorder the list if you want a different front-to-back stacking order.",
+            message: "Captured \(appSummary) across \(displaySummary) for \(selectedDesktopName). Reorder the list if you want a different front-to-back stacking order.",
             kind: .success
+        )
+    }
+
+    private func activeDesktopIDForCapture() -> CGSSpaceID? {
+        do {
+            return try desktopManager.activeDesktopID()
+        } catch {
+            captureFeedback = CaptureFeedback(
+                message: error.localizedDescription,
+                kind: .warning
+            )
+            return nil
+        }
+    }
+
+    private func captureCandidateLayout(
+        for app: NSRunningApplication,
+        activeDesktopID: CGSSpaceID,
+        requiredDisplay: DisplayInfo? = nil
+    ) -> CapturedLayout? {
+        guard let bundleID = app.bundleIdentifier else { return nil }
+        guard let result = WindowManager.captureDisplayRelativeLayout(
+            for: app,
+            matchingWindowID: { desktopManager.isWindow($0, onDesktop: activeDesktopID) }
+        ) else {
+            return nil
+        }
+
+        guard result.relativeFrame.width > 0 && result.relativeFrame.height > 0 else { return nil }
+
+        if let requiredDisplay,
+           sectionDisplay(for: result.display) != requiredDisplay {
+            return nil
+        }
+
+        return CapturedLayout(
+            absoluteFrame: result.absoluteFrame,
+            layout: AppLayout(
+                bundleIdentifier: bundleID,
+                appName: app.localizedName ?? bundleID,
+                frame: result.relativeFrame,
+                display: result.display
+            )
         )
     }
 
@@ -315,108 +607,6 @@ struct ConfigurationEditorView: View {
             guard !app.isHidden, !app.isTerminated else { return false }
             return app.activationPolicy == .regular || bundleIdentifier == finderBundleIdentifier
         }
-    }
-
-    private func deleteLayout(id: AppLayout.ID) {
-        config.appLayouts.removeAll { $0.id == id }
-    }
-
-    private func beginDragging(id: AppLayout.ID) {
-        dragResetTask?.cancel()
-        draggedLayoutID = id
-    }
-
-    private func handleDropTargetChange(isTargeted: Bool, at targetIndex: Int) {
-        if isTargeted {
-            dragResetTask?.cancel()
-            targetedInsertionIndex = targetIndex
-            return
-        }
-
-        if targetedInsertionIndex == targetIndex {
-            targetedInsertionIndex = nil
-            scheduleDragResetIfNeeded()
-        }
-    }
-
-    private func scheduleDragResetIfNeeded() {
-        dragResetTask?.cancel()
-
-        guard draggedLayoutID != nil else { return }
-
-        dragResetTask = Task {
-            try? await Task.sleep(for: .milliseconds(200))
-
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                if targetedInsertionIndex == nil {
-                    clearDragState()
-                }
-            }
-        }
-    }
-
-    private func clearDragState() {
-        dragResetTask?.cancel()
-        dragResetTask = nil
-        draggedLayoutID = nil
-        targetedInsertionIndex = nil
-    }
-
-    private func moveDraggedLayout(_ draggedID: AppLayout.ID, to targetIndex: Int) {
-        guard let sourceIndex = config.appLayouts.firstIndex(where: { $0.id == draggedID }) else {
-            clearDragState()
-            return
-        }
-
-        var destinationIndex = targetIndex
-        if sourceIndex < destinationIndex {
-            destinationIndex -= 1
-        }
-
-        let movedLayout = config.appLayouts.remove(at: sourceIndex)
-        let clampedDestination = min(max(destinationIndex, 0), config.appLayouts.count)
-        config.appLayouts.insert(movedLayout, at: clampedDestination)
-        clearDragState()
-    }
-
-    private var displaySections: [AppLayoutSection] {
-        let currentDisplayOrder = WindowManager.currentDisplays().map { DisplaySectionKey(display: $0) }
-        var groupedItems: [DisplaySectionKey: [IndexedAppLayout]] = [:]
-        var extraKeys: [DisplaySectionKey] = []
-
-        for (storageIndex, layout) in config.appLayouts.enumerated() {
-            let key = DisplaySectionKey(display: sectionDisplay(for: layout.display))
-
-            if groupedItems[key] == nil,
-               !currentDisplayOrder.contains(key),
-               !extraKeys.contains(key) {
-                extraKeys.append(key)
-            }
-
-            groupedItems[key, default: []].append(
-                IndexedAppLayout(
-                    storageIndex: storageIndex,
-                    layout: layout
-                )
-            )
-        }
-
-        let orderedKeys = currentDisplayOrder.filter { groupedItems[$0] != nil } + extraKeys
-
-        return orderedKeys.compactMap { key in
-            guard let layouts = groupedItems[key], !layouts.isEmpty else { return nil }
-            return AppLayoutSection(display: key.display, layouts: layouts)
-        }
-    }
-
-    private func canDrop(into display: DisplayInfo?) -> Bool {
-        guard let draggedLayoutID,
-              let draggedLayout = config.appLayouts.first(where: { $0.id == draggedLayoutID }) else {
-            return true
-        }
-
-        return sectionDisplay(for: draggedLayout.display) == display
     }
 
     private func sectionDisplay(for display: DisplayInfo?) -> DisplayInfo? {
@@ -448,14 +638,14 @@ struct ConfigurationEditorView: View {
     }
 
     private var unavailableLayoutCount: Int {
-        config.appLayouts.filter { layout in
+        selectedDesktopLayouts.filter { layout in
             guard let display = layout.display else { return false }
             return WindowManager.connectedDisplayInfo(for: display) == nil
         }.count
     }
 
     private func appLayouts(for display: DisplayInfo) -> [AppLayout] {
-        config.appLayouts.filter { layout in
+        selectedDesktopLayouts.filter { layout in
             sectionDisplay(for: layout.display) == display
         }
     }
@@ -477,15 +667,25 @@ struct ConfigurationEditorView: View {
     }
 
     private func removeUnavailableLayouts() {
-        config.appLayouts.removeAll { layout in
-            guard let display = layout.display else { return false }
-            return WindowManager.connectedDisplayInfo(for: display) == nil
-        }
+        replaceSelectedDesktopLayouts(
+            selectedDesktopLayouts.filter { layout in
+                guard let display = layout.display else { return true }
+                return WindowManager.connectedDisplayInfo(for: display) != nil
+            }
+        )
+    }
+
+    private func deleteLayout(id: AppLayout.ID) {
+        replaceSelectedDesktopLayouts(
+            selectedDesktopLayouts.filter { $0.id != id }
+        )
     }
 
     private func updateLayoutFrame(id: AppLayout.ID, frame: WindowFrame) {
-        guard let index = config.appLayouts.firstIndex(where: { $0.id == id }) else { return }
-        config.appLayouts[index].frame = roundedFrame(frame)
+        var layouts = selectedDesktopLayouts
+        guard let index = layouts.firstIndex(where: { $0.id == id }) else { return }
+        layouts[index].frame = roundedFrame(frame)
+        replaceSelectedDesktopLayouts(layouts)
     }
 
     private func reorderLayouts(
@@ -493,12 +693,13 @@ struct ConfigurationEditorView: View {
         moving draggedID: AppLayout.ID,
         after targetID: AppLayout.ID?
     ) {
-        let sectionIndices = config.appLayouts.indices.filter {
-            sectionDisplay(for: config.appLayouts[$0].display) == display
+        var layouts = selectedDesktopLayouts
+        let sectionIndices = layouts.indices.filter {
+            sectionDisplay(for: layouts[$0].display) == display
         }
         guard !sectionIndices.isEmpty else { return }
 
-        var sectionLayouts = sectionIndices.map { config.appLayouts[$0] }
+        var sectionLayouts = sectionIndices.map { layouts[$0] }
         guard let sourceIndex = sectionLayouts.firstIndex(where: { $0.id == draggedID }) else { return }
 
         let requestedDestinationIndex: Int
@@ -521,38 +722,38 @@ struct ConfigurationEditorView: View {
         sectionLayouts.insert(movedLayout, at: clampedDestinationIndex)
 
         for (offset, storageIndex) in sectionIndices.enumerated() {
-            config.appLayouts[storageIndex] = sectionLayouts[offset]
+            layouts[storageIndex] = sectionLayouts[offset]
         }
+
+        replaceSelectedDesktopLayouts(layouts)
+    }
+
+    private func takeExistingLayout(bundleIdentifier: String) -> AppLayout? {
+        for desktopIndex in config.desktops.indices {
+            if let layoutIndex = config.desktops[desktopIndex].appLayouts.firstIndex(where: {
+                $0.bundleIdentifier == bundleIdentifier
+            }) {
+                return config.desktops[desktopIndex].appLayouts.remove(at: layoutIndex)
+            }
+        }
+
+        return nil
     }
 
     private func addApp(_ app: DiscoveredApp, to display: DisplayInfo) -> AppLayout.ID? {
         let frame = suggestedFrame(for: display, existingLayouts: appLayouts(for: display))
+        var layout = takeExistingLayout(bundleIdentifier: app.bundleIdentifier)
+            ?? AppLayout(bundleIdentifier: app.bundleIdentifier, appName: app.name)
 
-        if let existingIndex = config.appLayouts.firstIndex(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
-            var remainingLayouts = config.appLayouts
-            var layout = remainingLayouts.remove(at: existingIndex)
-            layout.appName = app.name
-            layout.display = display
-            layout.frame = frame
+        layout.appName = app.name
+        layout.display = display
+        layout.frame = frame
 
-            let insertionIndex = insertionIndex(for: display, in: remainingLayouts)
-            remainingLayouts.insert(layout, at: insertionIndex)
-            config.appLayouts = remainingLayouts
-            return layout.id
-        }
-
-        let newLayout = AppLayout(
-            bundleIdentifier: app.bundleIdentifier,
-            appName: app.name,
-            frame: frame,
-            display: display
-        )
-
-        var nextLayouts = config.appLayouts
-        let insertionIndex = insertionIndex(for: display, in: nextLayouts)
-        nextLayouts.insert(newLayout, at: insertionIndex)
-        config.appLayouts = nextLayouts
-        return newLayout.id
+        var layouts = selectedDesktopLayouts.filter { $0.bundleIdentifier != app.bundleIdentifier }
+        let insertionIndex = insertionIndex(for: display, in: layouts)
+        layouts.insert(layout, at: insertionIndex)
+        replaceSelectedDesktopLayouts(layouts)
+        return layout.id
     }
 
     private func suggestedFrame(for display: DisplayInfo, existingLayouts: [AppLayout]) -> WindowFrame {
@@ -594,13 +795,13 @@ struct ConfigurationEditorView: View {
     }
 
     private func replaceLayouts(on display: DisplayInfo, with newLayouts: [AppLayout]) {
-        let remainingLayouts = config.appLayouts.filter {
+        let remainingLayouts = selectedDesktopLayouts.filter {
             sectionDisplay(for: $0.display) != display
         }
         var nextLayouts = remainingLayouts
         let insertionIndex = insertionIndex(for: display, in: nextLayouts)
         nextLayouts.insert(contentsOf: newLayouts, at: insertionIndex)
-        config.appLayouts = nextLayouts
+        replaceSelectedDesktopLayouts(nextLayouts)
     }
 
     private func captureCurrentDisplay(on display: DisplayInfo) {
@@ -612,31 +813,24 @@ struct ConfigurationEditorView: View {
             return
         }
 
+        guard let activeDesktopID = activeDesktopIDForCapture() else { return }
+
         let workspace = NSWorkspace.shared
         var capturedLayouts: [CapturedLayout] = []
 
         for app in runningApplicationsForCapture(in: workspace) {
-            guard let bundleID = app.bundleIdentifier else { continue }
-            guard let result = WindowManager.captureDisplayRelativeLayout(for: app) else { continue }
-            guard sectionDisplay(for: result.display) == display else { continue }
-            guard result.relativeFrame.width > 0 && result.relativeFrame.height > 0 else { continue }
+            guard let capturedLayout = captureCandidateLayout(
+                for: app,
+                activeDesktopID: activeDesktopID,
+                requiredDisplay: display
+            ) else { continue }
 
-            capturedLayouts.append(
-                CapturedLayout(
-                    absoluteFrame: result.absoluteFrame,
-                    layout: AppLayout(
-                        bundleIdentifier: bundleID,
-                        appName: app.localizedName ?? bundleID,
-                        frame: result.relativeFrame,
-                        display: result.display
-                    )
-                )
-            )
+            capturedLayouts.append(capturedLayout)
         }
 
         guard !capturedLayouts.isEmpty else {
             captureFeedback = CaptureFeedback(
-                message: "No standard app windows were available on \(display.name).",
+                message: "No standard app windows were available on \(display.name) for \(selectedDesktopName).",
                 kind: .warning
             )
             return
@@ -658,7 +852,7 @@ struct ConfigurationEditorView: View {
 
         let appSummary = sortedLayouts.count == 1 ? "1 app" : "\(sortedLayouts.count) apps"
         captureFeedback = CaptureFeedback(
-            message: "Captured \(appSummary) on \(display.name). Reorder the app list on the right if you want a different front-to-back stacking order.",
+            message: "Captured \(appSummary) on \(display.name) for \(selectedDesktopName). Reorder the app list on the right if you want a different front-to-back stacking order.",
             kind: .success
         )
     }
@@ -746,6 +940,56 @@ private struct EditorFieldRow<Content: View>: View {
             content
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
+    }
+}
+
+private struct DesktopSelectorCard: View {
+    let index: Int
+    let desktop: DesktopLayout
+    let isSelected: Bool
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(desktop.name)
+                .font(.headline)
+                .lineLimit(1)
+
+            Text("Desktop \(index + 1)")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+
+            Spacer(minLength: 0)
+
+            Text(desktop.appLayouts.count == 1 ? "1 app" : "\(desktop.appLayouts.count) apps")
+                .font(.caption.weight(.semibold))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.accentColor.opacity(0.14), in: Capsule())
+                .foregroundStyle(Color.accentColor)
+        }
+        .padding(12)
+        .frame(width: 180, height: 110, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: 16)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color.accentColor.opacity(isSelected ? 0.24 : 0.14),
+                            Color.accentColor.opacity(isSelected ? 0.08 : 0.04),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        }
+        .overlay {
+            RoundedRectangle(cornerRadius: 16)
+                .strokeBorder(
+                    Color.accentColor.opacity(isSelected ? 0.45 : 0.2),
+                    lineWidth: isSelected ? 2 : 1
+                )
+        }
+        .contentShape(RoundedRectangle(cornerRadius: 16))
     }
 }
 

@@ -117,8 +117,15 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             return
         }
 
-        let view = SettingsView(navigation: settingsNavigation, store: configStore)
-        settingsWindow = makeWindow(title: "MagicDesktop Settings", rootView: view, size: NSSize(width: 900, height: 600))
+        let spaceManager = self.spaceManager
+        let view = SettingsView(
+            navigation: settingsNavigation,
+            store: configStore,
+            onActivate: { config in
+                Task { await spaceManager.activate(config) }
+            }
+        )
+        settingsWindow = makeWindow(title: "MagicDesktop Settings", rootView: view, size: NSSize(width: 1140, height: 760))
     }
 
     private func makeWindow<V: View>(title: String, rootView: V, size: NSSize) -> NSWindow {

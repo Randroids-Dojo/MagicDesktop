@@ -10,6 +10,7 @@
 		02294E744D562E193B1896B3 /* MenuBarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB79DADF13DF881F30E9F9C8 /* MenuBarController.swift */; };
 		0887976CF17518F3C9AE4314 /* HotkeyService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA879BB080D78002EAC53D37 /* HotkeyService.swift */; };
 		0FEC228A84CBDF58DB112AFD /* SpaceConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = A34739FEAB72B84CF548A11B /* SpaceConfiguration.swift */; };
+		1E0A3957B5AB4F4C8D8313F0 /* DesktopManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1E0A3958B5AB4F4C8D8313F0 /* DesktopManager.swift */; };
 		2290690537BF666C9A0D9671 /* MagicDesktopApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 558CE1F2A7C4608A61A3C5D9 /* MagicDesktopApp.swift */; };
 		430DE1AA799C331AF2F633A1 /* BuildInstallService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B58CE4F83B09EB897188074 /* BuildInstallService.swift */; };
 		4B82FDB915DB8603C4099AE6 /* ConfigurationListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D731919C4EC03813AE5DC2E /* ConfigurationListView.swift */; };
@@ -26,6 +27,7 @@
 /* Begin PBXFileReference section */
 		0D731919C4EC03813AE5DC2E /* ConfigurationListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationListView.swift; sourceTree = "<group>"; };
 		17FD8857D7FF6E9DEF57A476 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		1E0A3958B5AB4F4C8D8313F0 /* DesktopManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesktopManager.swift; sourceTree = "<group>"; };
 		21C3D1244DD029B27A5C155E /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		3B58CE4F83B09EB897188074 /* BuildInstallService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BuildInstallService.swift; sourceTree = "<group>"; };
 		417CC034461791A7B0B31204 /* MagicDesktop.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MagicDesktop.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -83,6 +85,7 @@
 			children = (
 				3B58CE4F83B09EB897188074 /* BuildInstallService.swift */,
 				6BA3B81170312482B1EA617E /* ConfigurationStore.swift */,
+				1E0A3958B5AB4F4C8D8313F0 /* DesktopManager.swift */,
 				BA879BB080D78002EAC53D37 /* HotkeyService.swift */,
 				D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */,
 				DE9B62DB9180AB499DA8A88A /* WindowManager.swift */,
@@ -200,6 +203,7 @@
 				C55CC3137188FC0BD6C9D7C8 /* ConfigurationEditorView.swift in Sources */,
 				4B82FDB915DB8603C4099AE6 /* ConfigurationListView.swift in Sources */,
 				4DD565861B75C24E09E9E339 /* ConfigurationStore.swift in Sources */,
+				1E0A3957B5AB4F4C8D8313F0 /* DesktopManager.swift in Sources */,
 				0887976CF17518F3C9AE4314 /* HotkeyService.swift in Sources */,
 				FDC0A5086A664EE5A672853B /* KeyboardShortcuts+Names.swift in Sources */,
 				2290690537BF666C9A0D9671 /* MagicDesktopApp.swift in Sources */,
@@ -340,7 +344,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 26;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -348,7 +352,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.22;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.10;
@@ -362,7 +366,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 24;
+				CURRENT_PROJECT_VERSION = 26;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -370,7 +374,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.1.22;
+				MARKETING_VERSION = 0.2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.10;

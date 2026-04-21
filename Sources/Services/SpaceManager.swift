@@ -9,12 +9,14 @@ final class SpaceManager {
         subsystem: Bundle.main.bundleIdentifier ?? "MagicDesktop",
         category: "SpaceManager"
     )
+    private let desktopManager = DesktopManager()
 
     private struct PreparedLayout {
         let index: Int
         let app: NSRunningApplication
         let frame: WindowFrame
         let layout: AppLayout
+        let desktop: DesktopManager.ManagedDesktop
     }
 
     func activate(_ config: SpaceConfiguration) async {
@@ -23,46 +25,71 @@ final class SpaceManager {
             return
         }
 
-        logger.debug("Activating configuration '\(config.name)' with \(config.appLayouts.count) app layout(s)")
-
-        let preparedLayouts = await withTaskGroup(of: PreparedLayout?.self, returning: [PreparedLayout].self) { group in
-            for (index, layout) in config.appLayouts.enumerated() {
-                group.addTask {
-                    await self.prepareLayout(layout, index: index)
-                }
-            }
-
-            var preparedLayouts: [PreparedLayout] = []
-            for await preparedLayout in group {
-                if let preparedLayout {
-                    preparedLayouts.append(preparedLayout)
-                }
-            }
-
-            return preparedLayouts.sorted { $0.index < $1.index }
-        }
-
-        for preparedLayout in preparedLayouts {
-            if preparedLayout.app.isHidden {
-                logger.debug("Unhiding app '\(preparedLayout.layout.appName)' pid=\(preparedLayout.app.processIdentifier)")
-                preparedLayout.app.unhide()
-            }
+        do {
+            try desktopManager.validateEnvironment()
+            let targetDesktops = try desktopManager.ensureDesktopCount(config.desktops.count)
 
             logger.debug(
-                "Applying layout \(preparedLayout.index) for '\(preparedLayout.layout.appName)' bundle=\(preparedLayout.layout.bundleIdentifier) targetFrame=\(Self.describe(preparedLayout.frame)) display=\(preparedLayout.layout.display?.displayString ?? "none")"
+                "Activating configuration '\(config.name)' with \(config.desktops.count) desktop(s) and \(config.totalAppCount) app layout(s)"
             )
 
-            await WindowManager.positionAndRaiseWindow(for: preparedLayout.app, frame: preparedLayout.frame)
+            for (desktopIndex, desktopLayout) in config.desktops.enumerated() {
+                let targetDesktop = targetDesktops[desktopIndex]
 
-            if let finalFrame = WindowManager.captureCurrentFrame(for: preparedLayout.app) {
-                logger.debug("Final observed frame for '\(preparedLayout.layout.appName)' is \(Self.describe(finalFrame))")
-            } else {
-                logger.error("Could not read final frame for '\(preparedLayout.layout.appName)' after move")
+                logger.debug(
+                    "Preparing desktop \(desktopIndex + 1) '\(desktopLayout.name)' spaceID=\(targetDesktop.id) with \(desktopLayout.appLayouts.count) app(s)"
+                )
+
+                desktopManager.renameDesktop(targetDesktop, to: desktopLayout.name)
+                try await desktopManager.switchToDesktop(targetDesktop)
+
+                let preparedLayouts = await withTaskGroup(of: PreparedLayout?.self, returning: [PreparedLayout].self) { group in
+                    for (layoutIndex, layout) in desktopLayout.appLayouts.enumerated() {
+                        group.addTask {
+                            await self.prepareLayout(layout, index: layoutIndex, on: targetDesktop)
+                        }
+                    }
+
+                    var preparedLayouts: [PreparedLayout] = []
+                    for await preparedLayout in group {
+                        if let preparedLayout {
+                            preparedLayouts.append(preparedLayout)
+                        }
+                    }
+
+                    return preparedLayouts.sorted { $0.index < $1.index }
+                }
+
+                for preparedLayout in preparedLayouts {
+                    if preparedLayout.app.isHidden {
+                        logger.debug("Unhiding app '\(preparedLayout.layout.appName)' pid=\(preparedLayout.app.processIdentifier)")
+                        preparedLayout.app.unhide()
+                    }
+
+                    logger.debug(
+                        "Applying desktop \(desktopIndex + 1) layout \(preparedLayout.index) for '\(preparedLayout.layout.appName)' bundle=\(preparedLayout.layout.bundleIdentifier) targetFrame=\(Self.describe(preparedLayout.frame)) display=\(preparedLayout.layout.display?.displayString ?? "none")"
+                    )
+
+                    await WindowManager.positionAndRaiseWindow(for: preparedLayout.app, frame: preparedLayout.frame)
+
+                    if let finalFrame = WindowManager.captureCurrentFrame(for: preparedLayout.app) {
+                        logger.debug("Final observed frame for '\(preparedLayout.layout.appName)' is \(Self.describe(finalFrame))")
+                    } else {
+                        logger.error("Could not read final frame for '\(preparedLayout.layout.appName)' after move")
+                    }
+                }
             }
+        } catch {
+            logger.error("Failed to activate configuration '\(config.name)': \(error.localizedDescription)")
+            presentActivationError(error.localizedDescription)
         }
     }
 
-    private func prepareLayout(_ layout: AppLayout, index: Int) async -> PreparedLayout? {
+    private func prepareLayout(
+        _ layout: AppLayout,
+        index: Int,
+        on desktop: DesktopManager.ManagedDesktop
+    ) async -> PreparedLayout? {
         let frame = resolveFrame(layout)
         let workspace = NSWorkspace.shared
 
@@ -71,7 +98,8 @@ final class SpaceManager {
                 "Using running app '\(layout.appName)' bundle=\(layout.bundleIdentifier) pid=\(app.processIdentifier) resolvedFrame=\(Self.describe(frame))"
             )
             await ensureRestorableWindow(for: app, layout: layout, workspace: workspace)
-            return PreparedLayout(index: index, app: app, frame: frame, layout: layout)
+            moveWindowIfNeeded(for: app, to: desktop, layout: layout)
+            return PreparedLayout(index: index, app: app, frame: frame, layout: layout, desktop: desktop)
         } else {
             guard let appURL = workspace.urlForApplication(withBundleIdentifier: layout.bundleIdentifier) else {
                 logger.error("Could not find app bundle=\(layout.bundleIdentifier)")
@@ -92,8 +120,9 @@ final class SpaceManager {
                 } else {
                     await waitForWindow(app: app)
                 }
+                moveWindowIfNeeded(for: app, to: desktop, layout: layout)
                 logger.debug("Launched app bundle=\(layout.bundleIdentifier) pid=\(app.processIdentifier) resolvedFrame=\(Self.describe(frame))")
-                return PreparedLayout(index: index, app: app, frame: frame, layout: layout)
+                return PreparedLayout(index: index, app: app, frame: frame, layout: layout, desktop: desktop)
             } catch {
                 logger.error("Failed to launch bundle=\(layout.bundleIdentifier): \(error.localizedDescription)")
                 return nil
@@ -140,6 +169,30 @@ final class SpaceManager {
 
         _ = workspace.open(homeURL)
         await waitForWindow(app: app)
+    }
+
+    private func moveWindowIfNeeded(
+        for app: NSRunningApplication,
+        to desktop: DesktopManager.ManagedDesktop,
+        layout: AppLayout
+    ) {
+        guard let windowID = WindowManager.targetWindowID(for: app) else {
+            logger.debug(
+                "No CGWindowID available for '\(layout.appName)' bundle=\(layout.bundleIdentifier); leaving it on the current desktop"
+            )
+            return
+        }
+
+        desktopManager.moveWindow(windowID, to: desktop)
+    }
+
+    private func presentActivationError(_ message: String) {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "MagicDesktop could not restore this configuration"
+        alert.informativeText = message
+        NSApp.activate(ignoringOtherApps: true)
+        alert.runModal()
     }
 
     private static func describe(_ frame: WindowFrame) -> String {
