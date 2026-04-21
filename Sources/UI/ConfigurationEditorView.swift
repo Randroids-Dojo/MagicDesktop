@@ -285,7 +285,6 @@ struct ConfigurationEditorView: View {
                     displays: connectedDisplays,
                     selectedDisplayID: selectedDisplayID,
                     appCountForDisplay: appCount(for:),
-                    preferredHeight: 150,
                     isExpanded: false,
                     onToggleExpand: nil,
                     onSelect: { display in
@@ -1046,7 +1045,7 @@ private struct ConnectedDisplaysOverview: View {
 
                 Spacer()
 
-                Text("Click a monitor to edit it visually. Scroll to see the full arrangement.")
+                Text("Click a monitor to edit it visually. Scroll horizontally to see the full arrangement.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
 
@@ -1061,7 +1060,7 @@ private struct ConnectedDisplaysOverview: View {
                 }
             }
 
-            ScrollView([.horizontal, .vertical], showsIndicators: true) {
+            ScrollView(.horizontal, showsIndicators: true) {
                 ZStack(alignment: .topLeading) {
                     RoundedRectangle(cornerRadius: 16)
                         .fill(Color(nsColor: .controlBackgroundColor))
@@ -1103,7 +1102,7 @@ private struct ConnectedDisplaysOverview: View {
     }
 
     private var overviewHeight: CGFloat {
-        preferredHeight ?? min(max(overviewMetrics.contentSize.height, 190), 280)
+        max(preferredHeight ?? 0, overviewMetrics.contentSize.height, 190)
     }
 }
 
