@@ -1,4 +1,5 @@
 import AppKit
+import KeyboardShortcuts
 import SwiftUI
 
 @MainActor
@@ -48,7 +49,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
             emptyItem.isEnabled = false
             menu.addItem(emptyItem)
         } else {
-            for config in configs {
+            for (index, config) in configs.enumerated() {
                 let item = NSMenuItem(
                     title: config.name,
                     action: #selector(activateConfiguration(_:)),
@@ -56,6 +57,9 @@ final class MenuBarController: NSObject, NSMenuDelegate {
                 )
                 item.target = self
                 item.representedObject = config.id
+                if index < 9 {
+                    item.setShortcut(for: .spaceSlot(index))
+                }
                 menu.addItem(item)
             }
         }
