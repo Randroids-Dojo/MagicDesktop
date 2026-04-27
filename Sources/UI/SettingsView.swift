@@ -18,6 +18,7 @@ final class SettingsNavigationModel {
 private enum SidebarDestination: Hashable {
     case configuration(SpaceConfiguration.ID)
     case buildInstall
+    case diagnostics
 }
 
 /// Root of the settings window.
@@ -88,6 +89,14 @@ struct SettingsView: View {
                     Image(systemName: "hammer")
                 }
                 .tag(SidebarDestination.buildInstall)
+                .padding(.vertical, 2)
+
+                Label {
+                    Text("Diagnostics")
+                } icon: {
+                    Image(systemName: "doc.text.magnifyingglass")
+                }
+                .tag(SidebarDestination.diagnostics)
                 .padding(.vertical, 2)
             } header: {
                 sectionHeader("System")
@@ -169,6 +178,8 @@ struct SettingsView: View {
             }
         case .buildInstall:
             BuildInstallPane()
+        case .diagnostics:
+            DiagnosticsPane()
         case .none:
             emptyState(
                 title: store.configurations.isEmpty ? "No configurations yet" : "Select a configuration",
@@ -440,6 +451,113 @@ private struct BuildInstallPane: View {
                 .foregroundStyle(buildService.isFailed ? .red : .secondary)
                 .lineLimit(2)
         }
+    }
+
+    @ViewBuilder
+    private func card<Content: View>(@ViewBuilder _ content: () -> Content) -> some View {
+        content()
+            .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(
+                RoundedRectangle(cornerRadius: 14)
+                    .fill(Color(nsColor: .controlBackgroundColor))
+            )
+    }
+}
+
+// MARK: - Diagnostics Pane
+
+private struct DiagnosticsPane: View {
+    @State private var diagnosticService = DiagnosticLogService()
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                header
+
+                card {
+                    VStack(alignment: .leading, spacing: 14) {
+                        sectionTitle("Logs")
+
+                        Button {
+                            diagnosticService.captureFullLogs()
+                        } label: {
+                            HStack(spacing: 10) {
+                                if diagnosticService.isCapturing {
+                                    ProgressView().controlSize(.small)
+                                } else {
+                                    Image(systemName: "doc.text.magnifyingglass")
+                                }
+                                Text(diagnosticService.isCapturing ? "Capturing Logs..." : "Capture Full Logs")
+                                    .fontWeight(.medium)
+                                Spacer()
+                            }
+                            .padding(.vertical, 4)
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .controlSize(.large)
+                        .disabled(diagnosticService.isCapturing)
+
+                        if let message = diagnosticService.statusMessage {
+                            statusLine(message)
+                        }
+                    }
+                }
+
+                Text("Creates a timestamped diagnostics report on the Desktop and reveals it in Finder. The report includes MagicDesktop unified logs, Spaces preferences, display information, app versions, process details, and the saved configuration JSON.")
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 4)
+            }
+            .padding(24)
+            .frame(maxWidth: 760, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Diagnostics")
+                .font(.system(size: 22, weight: .semibold))
+            Text("Capture MagicDesktop logs and local state for troubleshooting.")
+                .font(.callout)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .tracking(0.5)
+    }
+
+    @ViewBuilder
+    private func statusLine(_ message: String) -> some View {
+        HStack(spacing: 8) {
+            switch diagnosticService.state {
+            case .idle:
+                EmptyView()
+            case .capturing:
+                ProgressView().controlSize(.small)
+            case .completed:
+                Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
+            case .failed:
+                Image(systemName: "xmark.octagon.fill").foregroundStyle(.red)
+            }
+
+            Text(message)
+                .font(.callout)
+                .foregroundStyle(isFailed ? .red : .secondary)
+                .lineLimit(2)
+        }
+    }
+
+    private var isFailed: Bool {
+        if case .failed = diagnosticService.state { return true }
+        return false
     }
 
     @ViewBuilder

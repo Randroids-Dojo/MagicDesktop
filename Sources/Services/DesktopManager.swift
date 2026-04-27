@@ -49,9 +49,7 @@ final class DesktopManager {
         .appendingPathComponent("Library/Preferences/com.apple.spaces.plist")
 
     func validateEnvironment() throws {
-        if displaysHaveSeparateSpacesEnabled() {
-            throw DesktopError.separateSpacesEnabled
-        }
+        logSpacesConfiguration()
     }
 
     func currentDesktopStack() throws -> [ManagedDesktop] {
@@ -198,14 +196,15 @@ final class DesktopManager {
         return DesktopLayout.defaultName(for: fallbackIndex)
     }
 
-    private func displaysHaveSeparateSpacesEnabled() -> Bool {
+    private func logSpacesConfiguration() {
         guard let data = try? Data(contentsOf: spacesPreferencesURL),
               let rawValue = try? PropertyListSerialization.propertyList(from: data, format: nil),
               let root = rawValue as? [String: Any],
               let displayConfiguration = root["SpacesDisplayConfiguration"] as? [String: Any],
               let managementData = displayConfiguration["Management Data"] as? [String: Any],
               let monitors = managementData["Monitors"] as? [[String: Any]] else {
-            return false
+            logger.debug("Spaces preference check: preferences unavailable")
+            return
         }
 
         let managementMode = managementData["Management Mode"] as? Int
@@ -217,12 +216,6 @@ final class DesktopManager {
         logger.debug(
             "Spaces preference check: managementMode=\(managementMode ?? -1) activeDesktopStacks=\(activeStackCount) monitorCount=\(monitors.count)"
         )
-
-        if managementMode == 1 {
-            return false
-        }
-
-        return activeStackCount > 1
     }
 }
 

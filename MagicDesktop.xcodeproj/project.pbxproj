@@ -17,6 +17,7 @@
 		4DD565861B75C24E09E9E339 /* ConfigurationStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6BA3B81170312482B1EA617E /* ConfigurationStore.swift */; };
 		4E05A98311CFB1341237ECC5 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 62B91CF7DC09092C84FB4404 /* KeyboardShortcuts */; };
 		63E3CF53F9C1ACA929192A67 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17FD8857D7FF6E9DEF57A476 /* SettingsView.swift */; };
+		68159319CA9F60EB7328FC35 /* DiagnosticLogService.swift in Sources */ = {isa = PBXBuildFile; fileRef = F6CE37E77A1676FDF5CECD38 /* DiagnosticLogService.swift */; };
 		718B72EA5237D3408B7F66B7 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 21C3D1244DD029B27A5C155E /* AppDelegate.swift */; };
 		A276710645ADCA21C7FDD020 /* WindowManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE9B62DB9180AB499DA8A88A /* WindowManager.swift */; };
 		BD6E7EBAD1778E4EBECDDB5D /* SpaceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */; };
@@ -42,6 +43,7 @@
 		CFAB95567CC60E352011A098 /* ConfigurationEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConfigurationEditorView.swift; sourceTree = "<group>"; };
 		D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceManager.swift; sourceTree = "<group>"; };
 		DE9B62DB9180AB499DA8A88A /* WindowManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowManager.swift; sourceTree = "<group>"; };
+		F6CE37E77A1676FDF5CECD38 /* DiagnosticLogService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogService.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -86,6 +88,7 @@
 				3B58CE4F83B09EB897188074 /* BuildInstallService.swift */,
 				6BA3B81170312482B1EA617E /* ConfigurationStore.swift */,
 				20B2855702BA3487A1DFBC3A /* DesktopManager.swift */,
+				F6CE37E77A1676FDF5CECD38 /* DiagnosticLogService.swift */,
 				BA879BB080D78002EAC53D37 /* HotkeyService.swift */,
 				D3BEC0BE98EF58D6C0EA5459 /* SpaceManager.swift */,
 				DE9B62DB9180AB499DA8A88A /* WindowManager.swift */,
@@ -204,6 +207,7 @@
 				4B82FDB915DB8603C4099AE6 /* ConfigurationListView.swift in Sources */,
 				4DD565861B75C24E09E9E339 /* ConfigurationStore.swift in Sources */,
 				034496435CED65CE5B5284BF /* DesktopManager.swift in Sources */,
+				68159319CA9F60EB7328FC35 /* DiagnosticLogService.swift in Sources */,
 				0887976CF17518F3C9AE4314 /* HotkeyService.swift in Sources */,
 				FDC0A5086A664EE5A672853B /* KeyboardShortcuts+Names.swift in Sources */,
 				2290690537BF666C9A0D9671 /* MagicDesktopApp.swift in Sources */,
@@ -344,7 +348,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 35;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -352,7 +356,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.6;
+				MARKETING_VERSION = 0.3.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.10;
@@ -366,7 +370,7 @@
 				CODE_SIGN_ENTITLEMENTS = Sources/MagicDesktop.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				COMBINE_HIDPI_IMAGES = YES;
-				CURRENT_PROJECT_VERSION = 33;
+				CURRENT_PROJECT_VERSION = 35;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = Sources/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -374,7 +378,7 @@
 					"@executable_path/../Frameworks",
 				);
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
-				MARKETING_VERSION = 0.3.6;
+				MARKETING_VERSION = 0.3.8;
 				PRODUCT_BUNDLE_IDENTIFIER = com.randy.MagicDesktop;
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.10;
