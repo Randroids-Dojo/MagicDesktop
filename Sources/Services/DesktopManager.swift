@@ -208,11 +208,25 @@ final class DesktopManager {
             return false
         }
 
-        let monitorsWithDesktopStacks = monitors.filter { monitor in
-            monitor["Spaces"] != nil || monitor["Current Space"] != nil
+        let managementMode = managementData["Management Mode"] as? Int
+        let activeStackCount = monitors.filter { monitor in
+            guard let spaces = monitor["Spaces"] as? [[String: Any]] else { return false }
+            return spaces.contains { ($0["type"] as? Int) == CGSSpaceConstants.userSpaceType }
+        }.count
+
+        logger.debug(
+            "Spaces preference check: managementMode=\(managementMode ?? -1) activeDesktopStacks=\(activeStackCount) monitorCount=\(monitors.count)"
+        )
+
+        if activeStackCount > 1 {
+            return true
         }
 
-        return monitorsWithDesktopStacks.count > 1
+        if let managementMode {
+            return managementMode != 1
+        }
+
+        return false
     }
 }
 
