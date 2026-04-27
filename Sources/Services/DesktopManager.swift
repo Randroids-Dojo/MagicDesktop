@@ -218,6 +218,10 @@ final class DesktopManager {
             "Spaces preference check: managementMode=\(managementMode ?? -1) activeDesktopStacks=\(activeStackCount) monitorCount=\(monitors.count)"
         )
 
+        if managementMode == 1 {
+            return false
+        }
+
         return activeStackCount > 1
     }
 }
