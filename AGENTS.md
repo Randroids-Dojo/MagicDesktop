@@ -35,7 +35,7 @@ open MagicDesktop.xcodeproj
 - Be careful with Accessibility timing. Newly launched apps may not expose a usable window immediately.
 - Window stacking is order-sensitive. The final position/raise pass follows `config.appLayouts` order so later items end up above earlier ones.
 - Do not assume every app exposes `kAXMainWindowAttribute`; fallback window lookup is intentional.
-- `Edit Configurations…` and `Settings…` open the same settings window and only differ by the selected tab.
+- `Edit Configurations…`, `Settings…`, and `Diagnostics…` open the same settings window and only differ by the sidebar destination they pre-select.
 
 ## Verification
 

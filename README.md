@@ -51,6 +51,9 @@ The settings window is a split view with two main areas.
 - `Configurations`: every saved layout
 - `New Configuration`: creates another layout entry
 - `Build & Install`: rebuilds and reinstalls the app from a local repo clone
+- `Diagnostics`: captures a troubleshooting report with logs and local state
+
+The `Diagnostics…` entry in the menu bar opens this pane directly so a bug report can be generated without navigating into the editor.
 
 ### Configuration Editor
 

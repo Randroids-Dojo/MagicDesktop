@@ -6,6 +6,7 @@ import SwiftUI
 enum SettingsTab: Hashable {
     case configurations
     case buildInstall
+    case diagnostics
 }
 
 @MainActor
@@ -220,6 +221,8 @@ struct SettingsView: View {
             }
         case .buildInstall:
             selection = .buildInstall
+        case .diagnostics:
+            selection = .diagnostics
         }
     }
 

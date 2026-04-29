@@ -82,6 +82,14 @@ final class MenuBarController: NSObject, NSMenuDelegate {
         settingsItem.target = self
         menu.addItem(settingsItem)
 
+        let diagnosticsItem = NSMenuItem(
+            title: "Diagnostics…",
+            action: #selector(openDiagnostics),
+            keyEquivalent: ""
+        )
+        diagnosticsItem.target = self
+        menu.addItem(diagnosticsItem)
+
         menu.addItem(.separator())
 
         let quitItem = NSMenuItem(
@@ -108,6 +116,10 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     @objc private func openSettings() {
         openSettingsWindow(selecting: .buildInstall)
+    }
+
+    @objc private func openDiagnostics() {
+        openSettingsWindow(selecting: .diagnostics)
     }
 
     // MARK: - Window Helpers

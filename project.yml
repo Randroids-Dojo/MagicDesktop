@@ -22,8 +22,8 @@ targets:
         INFOPLIST_FILE: Sources/Info.plist
         CODE_SIGN_ENTITLEMENTS: Sources/MagicDesktop.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: com.randy.MagicDesktop
-        MARKETING_VERSION: "0.3.8"
-        CURRENT_PROJECT_VERSION: 35
+        MARKETING_VERSION: "0.3.9"
+        CURRENT_PROJECT_VERSION: 36
         SWIFT_VERSION: "5.10"
         MACOSX_DEPLOYMENT_TARGET: "14.0"
         GENERATE_INFOPLIST_FILE: false
